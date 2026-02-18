@@ -13,15 +13,12 @@
   <style>
     :root{
       --bg:#0b0712;
-      --card:#140b24;
       --text:#f1ecff;
       --muted:#cbbcff;
-      --accent:#a876ff;
-      --accent2:#ff77d6;
+      --border:rgba(255,255,255,.12);
       --ok:#5dffb2;
       --warn:#ffd36b;
       --bad:#ff6b8a;
-      --border:rgba(255,255,255,.12);
       --shadow: 0 18px 60px rgba(0,0,0,.35);
       --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     }
@@ -117,7 +114,7 @@
     th{color:var(--muted);font-weight:800;background:rgba(255,255,255,.03)}
     tr:last-child td{border-bottom:none}
     code{font-family:var(--mono);font-size:12px;color:rgba(241,236,255,.92)}
-    select,input[type="number"]{
+    input[type="number"]{
       padding:8px;border-radius:12px;
       background:rgba(0,0,0,.25);
       border:1px solid rgba(255,255,255,.18);
@@ -133,8 +130,10 @@
   <div class="wrap">
     <h1>eSAFE CSV – Fix + Reports + Renaming</h1>
     <p class="sub">
-      Upload → traitement → download. Tout se fait localement dans ton navigateur (GitHub Pages OK).
-      Génère aussi <b>Files.csv</b> et <b>Folders.csv</b> pour ton logiciel de renommage.
+      Upload → traitement → download. Tout se fait dans ton navigateur.
+      <br>
+      <b>Important :</b> les titres “corrigés” (max 50 + extension conservée) sont appliqués <b>uniquement</b> dans
+      <b>Files.csv</b> et <b>Folders.csv</b>.
     </p>
 
     <div class="grid">
@@ -150,7 +149,7 @@
 
         <div class="split"></div>
 
-        <h2>2) Options</h2>
+        <h2>2) Options (CSV corrigé)</h2>
 
         <div class="opt">
           <input id="optTypeCtoO" type="checkbox" checked />
@@ -181,23 +180,23 @@
           </div>
         </div>
 
+        <div class="split"></div>
+
+        <h2>3) Rapports</h2>
+
         <div class="opt">
           <input id="optLongNames" type="checkbox" checked />
           <div style="width:100%">
-            <label for="optLongNames"><b>Rapport : noms trop longs</b></label>
-            <small>Détecte les valeurs dépassant une longueur max (par défaut 40).</small>
+            <label for="optLongNames"><b>Rapport : noms trop longs</b> (basé sur <code>isadg.title</code>)</label>
+            <small>
+              Détecte les titres dépassant un seuil (ex: 40). Le rapport inclut aussi <code>suggested_50</code> (max 50 + extension conservée).
+            </small>
 
             <div class="row" style="margin-top:10px">
-              <span class="pill">Champ</span>
-              <select id="longField">
-                <option value="isadg.title" selected>isadg.title</option>
-                <option value="id_display_name">id_display_name</option>
-                <option value="id_path">id_path</option>
-                <option value="isadg.identifier">isadg.identifier</option>
-              </select>
-
-              <span class="pill">Max</span>
+              <span class="pill">Seuil “trop long”</span>
               <input id="maxLen" type="number" value="40" min="1" style="width:110px" />
+              <span class="pill">Correction appliquée dans Files/Folders</span>
+              <span class="pill"><b>50</b> caractères max</span>
             </div>
           </div>
         </div>
@@ -213,18 +212,18 @@
         <div id="log" class="log" aria-live="polite"></div>
 
         <div class="footer">
-          Notes :
+          Exports :
           <ul style="margin:8px 0 0 18px;padding:0">
-            <li><b>Files.csv</b> : uniquement <code>type=F</code> avec <code>ID,title</code>.</li>
-            <li><b>Folders.csv</b> : uniquement <code>type=O</code> avec <code>ID,title</code>, tri <b>root → profondeur</b>.</li>
-            <li>Si un parent est manquant, l’élément est traité comme “root”.</li>
+            <li><b>Files.csv</b> : <code>type=F</code>, colonnes <code>ID,title</code> (title tronqué à 50 si nécessaire, extension conservée).</li>
+            <li><b>Folders.csv</b> : <code>type=O</code>, colonnes <code>ID,title</code>, tri root → profondeur (title tronqué à 50 si nécessaire).</li>
+            <li><b>CSV corrigé</b> : applique tes règles mais <b>ne tronque pas</b> les titres.</li>
           </ul>
         </div>
       </div>
 
       <!-- RIGHT -->
       <div class="card">
-        <h2>3) Downloads</h2>
+        <h2>4) Downloads</h2>
         <div class="row" style="justify-content:flex-end">
           <button id="dlFixed" class="btn" disabled>CSV corrigé</button>
           <button id="dlFiles" class="btn secondary" disabled>Files.csv</button>
@@ -238,7 +237,7 @@
           <div class="k"><b id="kRows">—</b><span>Lignes</span></div>
           <div class="k"><b id="kCols">—</b><span>Colonnes</span></div>
           <div class="k"><b id="kChanged">—</b><span>Modifs appliquées</span></div>
-          <div class="k"><b id="kLong">—</b><span>Noms trop longs</span></div>
+          <div class="k"><b id="kLong">—</b><span>Noms trop longs (rapport)</span></div>
         </div>
 
         <div class="tablewrap">
@@ -253,8 +252,8 @@
         </div>
 
         <div class="footer">
-          Encodage : export en <b>UTF-8</b> (compatible Excel). Délimiteur conservé pour le CSV corrigé + rapports.
-          <br>Pour <b>Files.csv</b> & <b>Folders.csv</b> (logiciel de renommage) : sortie en <b>virgule</b> (comma).
+          Encodage : export UTF-8 (compatible Excel, BOM inclus).<br>
+          Délimiteur conservé pour <b>CSV corrigé</b> + rapports. <b>Files.csv</b> & <b>Folders.csv</b> sortent en virgule.
         </div>
       </div>
     </div>
@@ -262,6 +261,8 @@
 
 <script>
   const $ = (id) => document.getElementById(id);
+
+  const CORRECT_MAX_LEN = 50; // requested: corrected names only in Files/Folders at 50 max (keep extension)
 
   const state = {
     fileNameBase: null,
@@ -313,8 +314,45 @@
     if (typeof value !== "string") return value;
     return value.endsWith("Z") ? value.slice(0, -1) : value;
   }
+
+  // Keep extension, shorten only basename, add ellipsis, maxLen total
+  function suggestShortNameKeepExt(filename, maxLen=50){
+    let original = String(filename ?? "").trim().replace(/\s+/g, " ");
+    if (!original) return original;
+
+    // detect extension (last dot, but ignore leading dot files)
+    const lastDot = original.lastIndexOf(".");
+    let name = original;
+    let ext = "";
+
+    if (lastDot > 0 && lastDot < original.length - 1){
+      name = original.slice(0, lastDot);
+      ext = original.slice(lastDot); // includes "."
+    }
+
+    if (original.length <= maxLen) return original;
+
+    const allowedNameLen = maxLen - ext.length - 1; // -1 for ellipsis
+    if (allowedNameLen <= 0) return original.slice(0, maxLen);
+
+    let cut = name.slice(0, allowedNameLen);
+
+    // cut at a space if possible, but don't cut too early
+    const lastSpace = cut.lastIndexOf(" ");
+    if (lastSpace >= Math.floor(allowedNameLen * 0.6)){
+      cut = cut.slice(0, lastSpace);
+    }
+
+    return cut.trimEnd() + "…" + ext;
+  }
+
+  function correctedTitle50(title){
+    const t = String(title ?? "").trim().replace(/\s+/g, " ");
+    if (!t) return t;
+    return (t.length > CORRECT_MAX_LEN) ? suggestShortNameKeepExt(t, CORRECT_MAX_LEN) : t;
+  }
+
   function downloadText(filename, text){
-    // UTF-8 with BOM helps Excel; but keep it light:
     const bom = "\uFEFF";
     const blob = new Blob([bom + text], {type: "text/csv;charset=utf-8"});
     const url = URL.createObjectURL(blob);
@@ -361,15 +399,15 @@
     rows.push({metric:"rows", value: state.data.length});
     rows.push({metric:"columns", value: state.fields.length});
     rows.push({metric:"changes_applied", value: state.changedCount});
-    rows.push({metric:"long_names", value: state.longCount});
+    rows.push({metric:"long_names_report_count", value: state.longCount});
+    rows.push({metric:"rename_outputs_title_max_len", value: CORRECT_MAX_LEN});
     for (const [t,c] of Object.entries(state.typeCounts)){
       rows.push({metric:`type_${t || "empty"}_count`, value:c});
     }
-    // keep same delimiter as original
     return Papa.unparse(rows, {delimiter: state.delimiter || ","});
   }
 
-  // -------- Core rules
+  // -------- Core rules (for fixed CSV only)
   function applyRules(rows){
     state.changedCount = 0;
 
@@ -391,13 +429,11 @@
     const dateCols = ["isadg.eventStartDates", "isadg.eventEndDates"];
 
     for (const r of rows){
-      // 1) type C -> O
       if (optTypeCtoO && safeGet(r,"type") === "C"){
         r["type"] = "O";
         state.changedCount++;
       }
 
-      // 2) strip trailing Z on dates
       if (optStripZ){
         for (const col of dateCols){
           if (Object.prototype.hasOwnProperty.call(r, col)){
@@ -411,7 +447,6 @@
         }
       }
 
-      // 3) duplicate fields
       if (optDupFields){
         const title = safeGet(r,"isadg.title");
         const ident = safeGet(r,"isadg.identifier");
@@ -432,74 +467,74 @@
     });
   }
 
-  // -------- Long names report
+  // -------- Long names report (ONLY isadg.title; includes suggested_50 keeping extension)
   function buildLongNamesReport(rows){
     if (!$("optLongNames").checked){
       state.longCount = 0;
       return null;
     }
-    const field = $("longField").value;
     const maxLen = parseInt($("maxLen").value || "40", 10);
 
     const report = [];
     for (const r of rows){
-      const val = String(safeGet(r, field) ?? "").trim();
-      if (val.length > maxLen){
+      const originalTitle = String(safeGet(r,"isadg.title") ?? "").trim().replace(/\s+/g, " ");
+      if (!originalTitle) continue;
+
+      if (originalTitle.length > maxLen){
+        const suggestion50 = suggestShortNameKeepExt(originalTitle, CORRECT_MAX_LEN);
         report.push({
           id: safeGet(r,"id"),
           type: safeGet(r,"type"),
           parent_id: safeGet(r,"parent_id"),
-          field_checked: field,
-          value: val,
-          length: val.length,
-          isadg_title: safeGet(r,"isadg.title"),
+          isadg_title: originalTitle,
+          title_length: originalTitle.length,
+          suggested_50: suggestion50,
+          suggested_50_length: suggestion50.length,
           id_path: safeGet(r,"id_path"),
           isadg_identifier: safeGet(r,"isadg.identifier")
         });
       }
     }
-    report.sort((a,b)=>b.length - a.length);
+    report.sort((a,b)=>b.title_length - a.title_length);
     state.longCount = report.length;
     return Papa.unparse(report, {delimiter: state.delimiter || ","});
   }
 
-  // -------- Files.csv & Folders.csv for renaming tool
-  // Files.csv: only type F, columns: ID,title
+  // -------- Files.csv / Folders.csv (apply corrected title only HERE)
   function buildFilesCsv(rows){
     const out = [];
     for (const r of rows){
       if (String(safeGet(r,"type")) === "F"){
-        out.push({ID: safeGet(r,"id"), title: safeGet(r,"isadg.title")});
+        const id = safeGet(r,"id");
+        const title = correctedTitle50(safeGet(r,"isadg.title"));
+        out.push({ID: id, title: title});
       }
     }
-    // For renaming tools, comma delimiter is usually safest
     return Papa.unparse(out, {delimiter: ","});
   }
 
-  // Folders.csv: only type O, columns: ID,title, sorted by tree depth (root->deep)
   function buildFoldersCsvSorted(rows){
-    // collect folder nodes
     const folders = [];
     const byId = new Map();
+
     for (const r of rows){
       if (String(safeGet(r,"type")) === "O"){
         const id = String(safeGet(r,"id") ?? "");
         const parent = String(safeGet(r,"parent_id") ?? "");
-        const title = String(safeGet(r,"isadg.title") ?? "");
+        const titleRaw = safeGet(r,"isadg.title");
+        const title = correctedTitle50(titleRaw);
         const node = { id, parent_id: parent, title };
         folders.push(node);
         if (id) byId.set(id, node);
       }
     }
 
-    // roots = parent_id empty OR parent not found among folders
     const roots = [];
     for (const n of folders){
       const p = (n.parent_id || "").trim();
       if (!p || !byId.has(p)) roots.push(n);
     }
 
-    // BFS from roots to assign depth; fallback for disconnected nodes
     const depth = new Map();
     const q = [];
     for (const r of roots){
@@ -507,14 +542,14 @@
       q.push(r);
     }
 
-    // Build children map
     const children = new Map();
     for (const n of folders){
       const p = (n.parent_id || "").trim();
       if (!children.has(p)) children.set(p, []);
       children.get(p).push(n);
     }
-    // deterministic order inside siblings (title, id)
+
+    // deterministic order among siblings
     for (const [k, arr] of children.entries()){
       arr.sort((a,b)=>{
         const ta = (a.title || "").localeCompare(b.title || "", "fr", {sensitivity:"base"});
@@ -534,12 +569,10 @@
       }
     }
 
-    // any folder without depth => treat as root-ish (depth 0)
     for (const n of folders){
       if (!depth.has(n.id)) depth.set(n.id, 0);
     }
 
-    // Sort by depth asc then title then id
     folders.sort((a,b)=>{
       const da = depth.get(a.id) ?? 0;
       const db = depth.get(b.id) ?? 0;
@@ -549,14 +582,8 @@
       return (a.id || "").localeCompare(b.id || "");
     });
 
-    const out = folders.map(f => ({ID: f.id, title: f.title, depth: depth.get(f.id) ?? 0}));
-    // If you want ONLY ID + title (no depth), comment the line above and use:
-    // const out = folders.map(f => ({ID: f.id, title: f.title}));
-
-    // As requested: only ID and title.
-    // We'll generate without depth:
-    const out2 = folders.map(f => ({ID: f.id, title: f.title}));
-    return Papa.unparse(out2, {delimiter: ","});
+    const out = folders.map(f => ({ID: f.id, title: f.title}));
+    return Papa.unparse(out, {delimiter: ","});
   }
 
   // -------- Reset
@@ -581,7 +608,7 @@
   }
 
   // -------- LocalStorage (remember options)
-  const OPT_KEYS = ["optTypeCtoO","optStripZ","optDupFields","optLongNames","longField","maxLen"];
+  const OPT_KEYS = ["optTypeCtoO","optStripZ","optDupFields","optLongNames","maxLen"];
   function saveOpts(){
     const o = {};
     for (const k of OPT_KEYS){
@@ -647,28 +674,28 @@
     log("Traitement…", "ok");
     setStatus("Traitement en cours…");
 
-    // Deep-ish copy
     const rows = state.data.map(r => ({...r}));
     state.fields = [...(state.fields || [])];
 
-    // Apply rules
+    // fixed CSV rules
     applyRules(rows);
 
-    // Recompute counts after changes
+    // counts after rules (C->O etc.)
     computeTypeCounts(rows);
 
-    // Build outputs
+    // outputs
     state.fixedCsv   = toCsv(rows);
     state.longCsv    = buildLongNamesReport(rows);
     state.statsCsv   = buildStatsReport();
+
+    // renaming outputs ONLY: apply corrected titles here
     state.filesCsv   = buildFilesCsv(rows);
     state.foldersCsv = buildFoldersCsvSorted(rows);
 
-    log(`Modifs appliquées: ${state.changedCount}`, "ok");
-    log(`Noms trop longs: ${state.longCount}`, state.longCount ? "warn" : "ok");
-    log(`Exports renommage: Files.csv (${(state.filesCsv.match(/\n/g)||[]).length} lignes approx), Folders.csv (${(state.foldersCsv.match(/\n/g)||[]).length} lignes approx)`, "ok");
+    log(`Modifs appliquées (CSV corrigé): ${state.changedCount}`, "ok");
+    log(`Rapport noms trop longs: ${state.longCount}`, state.longCount ? "warn" : "ok");
+    log(`Correction renommage: titres max ${CORRECT_MAX_LEN} (Files.csv / Folders.csv uniquement)`, "ok");
 
-    // Enable downloads
     $("dlFixed").disabled = false;
     $("dlStats").disabled = false;
     $("dlFiles").disabled = false;
@@ -698,7 +725,6 @@
     downloadText(`${state.fileNameBase}_stats.csv`, state.statsCsv);
   });
 
-  // Renaming tool outputs:
   $("dlFiles").addEventListener("click", () => {
     if (!state.filesCsv) return;
     downloadText(`Files.csv`, state.filesCsv);
@@ -714,10 +740,10 @@
     const zip = new JSZip();
     const base = state.fileNameBase || "export";
 
-    if (state.fixedCsv)   zip.file(`${base}_fixed.csv`, state.fixedCsv);
-    if (state.longCsv)    zip.file(`${base}_longnames.csv`, state.longCsv);
-    if (state.statsCsv)   zip.file(`${base}_stats.csv`, state.statsCsv);
-    if (state.filesCsv)   zip.file(`Files.csv`, state.filesCsv);
+    zip.file(`${base}_fixed.csv`, state.fixedCsv || "");
+    if (state.longCsv)  zip.file(`${base}_longnames.csv`, state.longCsv);
+    if (state.statsCsv) zip.file(`${base}_stats.csv`, state.statsCsv);
+    if (state.filesCsv) zip.file(`Files.csv`, state.filesCsv);
     if (state.foldersCsv) zip.file(`Folders.csv`, state.foldersCsv);
 
     const blob = await zip.generateAsync({ type: "blob" });
@@ -731,14 +757,13 @@
     URL.revokeObjectURL(url);
   });
 
-  // Remember options
+  // remember options
   loadOpts();
   for (const k of OPT_KEYS){
     const el = $(k);
     if (el) el.addEventListener("change", saveOpts);
   }
 
-  // init
   resetAll();
 </script>
 </body>
