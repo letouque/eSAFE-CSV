@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -130,47 +130,47 @@
   <div class="wrap">
     <h1>eSAFE CSV – Fix + Reports + Renaming</h1>
     <p class="sub">
-      Upload → traitement → download. Tout se fait dans ton navigateur.
+      Upload → process → download. Everything runs locally in your browser.
       <br>
-      <b>Important :</b> les titres “corrigés” (max 50 + extension conservée) sont appliqués <b>uniquement</b> dans
-      <b>Files.csv</b> et <b>Folders.csv</b>.
+      <b>Important:</b> corrected titles (max 50 chars, extension preserved) are applied <b>only</b> in
+      <b>Files.csv</b> and <b>Folders.csv</b>.
     </p>
 
     <div class="grid">
       <!-- LEFT -->
       <div class="card">
-        <h2>1) Import</h2>
+        <h2>1) Upload</h2>
         <div class="file">
           <input id="file" type="file" accept=".csv,text/csv" />
           <div class="hint">
-            Délimiteur auto-détecté (souvent <code>;</code>). Mode “worker” activé pour éviter les freezes sur gros CSV.
+            Delimiter auto-detected (often <code>;</code>). Worker mode enabled to avoid UI freezes on large CSVs.
           </div>
         </div>
 
         <div class="split"></div>
 
-        <h2>2) Options (CSV corrigé)</h2>
+        <h2>2) Fixed CSV options</h2>
 
         <div class="opt">
           <input id="optTypeCtoO" type="checkbox" checked />
           <div>
-            <label for="optTypeCtoO"><b>Remplacer type C → O</b></label>
-            <small>Ton DPS ne prend pas en charge C.</small>
+            <label for="optTypeCtoO"><b>Replace type C → O</b></label>
+            <small>Your system does not support C (Collection).</small>
           </div>
         </div>
 
         <div class="opt">
           <input id="optStripZ" type="checkbox" checked />
           <div>
-            <label for="optStripZ"><b>Supprimer le “Z” final des dates</b></label>
-            <small>Sur <code>isadg.eventStartDates</code> et <code>isadg.eventEndDates</code> si présents.</small>
+            <label for="optStripZ"><b>Remove trailing “Z” from date/time fields</b></label>
+            <small>Applies to <code>isadg.eventStartDates</code> and <code>isadg.eventEndDates</code> when present.</small>
           </div>
         </div>
 
         <div class="opt">
           <input id="optDupFields" type="checkbox" checked />
           <div>
-            <label for="optDupFields"><b>Dupliquer les champs</b></label>
+            <label for="optDupFields"><b>Duplicate fields</b></label>
             <small>
               <code>isadg.title → id_display_name</code><br>
               <code>isadg.title → dc.title</code><br>
@@ -182,21 +182,21 @@
 
         <div class="split"></div>
 
-        <h2>3) Rapports</h2>
+        <h2>3) Reports</h2>
 
         <div class="opt">
           <input id="optLongNames" type="checkbox" checked />
           <div style="width:100%">
-            <label for="optLongNames"><b>Rapport : noms trop longs</b> (basé sur <code>isadg.title</code>)</label>
+            <label for="optLongNames"><b>Report: titles too long</b> (based on <code>isadg.title</code>)</label>
             <small>
-              Détecte les titres dépassant un seuil (ex: 40). Le rapport inclut aussi <code>suggested_50</code> (max 50 + extension conservée).
+              Flags titles over a threshold (e.g., 40). Report also includes <code>suggested_50</code> (max 50, extension preserved).
             </small>
 
             <div class="row" style="margin-top:10px">
-              <span class="pill">Seuil “trop long”</span>
+              <span class="pill">“Too long” threshold</span>
               <input id="maxLen" type="number" value="40" min="1" style="width:110px" />
-              <span class="pill">Correction appliquée dans Files/Folders</span>
-              <span class="pill"><b>50</b> caractères max</span>
+              <span class="pill">Renaming correction</span>
+              <span class="pill"><b>50</b> chars max</span>
             </div>
           </div>
         </div>
@@ -204,19 +204,19 @@
         <div class="split"></div>
 
         <div class="row">
-          <button id="run" class="btn" disabled>Traiter</button>
-          <button id="reset" class="btn secondary" disabled>Réinitialiser</button>
-          <span id="status" class="pill">En attente d’un fichier…</span>
+          <button id="run" class="btn" disabled>Process</button>
+          <button id="reset" class="btn secondary" disabled>Reset</button>
+          <span id="status" class="pill">Waiting for a file…</span>
         </div>
 
         <div id="log" class="log" aria-live="polite"></div>
 
         <div class="footer">
-          Exports :
+          Outputs:
           <ul style="margin:8px 0 0 18px;padding:0">
-            <li><b>Files.csv</b> : <code>type=F</code>, colonnes <code>ID,title</code> (title tronqué à 50 si nécessaire, extension conservée).</li>
-            <li><b>Folders.csv</b> : <code>type=O</code>, colonnes <code>ID,title</code>, tri root → profondeur (title tronqué à 50 si nécessaire).</li>
-            <li><b>CSV corrigé</b> : applique tes règles mais <b>ne tronque pas</b> les titres.</li>
+            <li><b>Files.csv</b>: <code>type=F</code>, columns <code>ID,title</code> (title shortened to 50 if needed, extension preserved).</li>
+            <li><b>Folders.csv</b>: <code>type=O</code>, columns <code>ID,title</code>, sorted root → depth (title shortened to 50 if needed).</li>
+            <li><b>Fixed CSV</b>: applies your rules but <b>does not shorten</b> titles.</li>
           </ul>
         </div>
       </div>
@@ -225,19 +225,19 @@
       <div class="card">
         <h2>4) Downloads</h2>
         <div class="row" style="justify-content:flex-end">
-          <button id="dlFixed" class="btn" disabled>CSV corrigé</button>
+          <button id="dlFixed" class="btn" disabled>Fixed CSV</button>
           <button id="dlFiles" class="btn secondary" disabled>Files.csv</button>
           <button id="dlFolders" class="btn secondary" disabled>Folders.csv</button>
-          <button id="dlLong" class="btn secondary" disabled>Long names</button>
+          <button id="dlLong" class="btn secondary" disabled>Long titles report</button>
           <button id="dlStats" class="btn secondary" disabled>Stats</button>
-          <button id="dlAll" class="btn" disabled>Tout (ZIP)</button>
+          <button id="dlAll" class="btn" disabled>All (ZIP)</button>
         </div>
 
         <div class="kpi">
-          <div class="k"><b id="kRows">—</b><span>Lignes</span></div>
-          <div class="k"><b id="kCols">—</b><span>Colonnes</span></div>
-          <div class="k"><b id="kChanged">—</b><span>Modifs appliquées</span></div>
-          <div class="k"><b id="kLong">—</b><span>Noms trop longs (rapport)</span></div>
+          <div class="k"><b id="kRows">—</b><span>Rows</span></div>
+          <div class="k"><b id="kCols">—</b><span>Columns</span></div>
+          <div class="k"><b id="kChanged">—</b><span>Changes applied</span></div>
+          <div class="k"><b id="kLong">—</b><span>Long titles (report)</span></div>
         </div>
 
         <div class="tablewrap">
@@ -252,8 +252,8 @@
         </div>
 
         <div class="footer">
-          Encodage : export UTF-8 (compatible Excel, BOM inclus).<br>
-          Délimiteur conservé pour <b>CSV corrigé</b> + rapports. <b>Files.csv</b> & <b>Folders.csv</b> sortent en virgule.
+          Encoding: UTF-8 (Excel-friendly, BOM included).<br>
+          Original delimiter preserved for <b>Fixed CSV</b> and reports. <b>Files.csv</b> & <b>Folders.csv</b> use commas.
         </div>
       </div>
     </div>
@@ -262,7 +262,7 @@
 <script>
   const $ = (id) => document.getElementById(id);
 
-  const CORRECT_MAX_LEN = 50; // requested: corrected names only in Files/Folders at 50 max (keep extension)
+  const CORRECT_MAX_LEN = 50; // corrected names only in Files/Folders at 50 max (keep extension)
 
   const state = {
     fileNameBase: null,
@@ -389,7 +389,7 @@
     }
     for (const [t,c] of entries){
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${t || "(vide)"}</td><td>${c}</td>`;
+      tr.innerHTML = `<td>${t || "(empty)"}</td><td>${c}</td>`;
       tbody.appendChild(tr);
     }
   }
@@ -399,7 +399,7 @@
     rows.push({metric:"rows", value: state.data.length});
     rows.push({metric:"columns", value: state.fields.length});
     rows.push({metric:"changes_applied", value: state.changedCount});
-    rows.push({metric:"long_names_report_count", value: state.longCount});
+    rows.push({metric:"long_titles_report_count", value: state.longCount});
     rows.push({metric:"rename_outputs_title_max_len", value: CORRECT_MAX_LEN});
     for (const [t,c] of Object.entries(state.typeCounts)){
       rows.push({metric:`type_${t || "empty"}_count`, value:c});
@@ -467,20 +467,20 @@
     });
   }
 
-  // -------- Long names report (ONLY isadg.title; includes suggested_50 keeping extension)
+  // -------- Long titles report (ONLY isadg.title; includes suggested_50 keeping extension)
   function buildLongNamesReport(rows){
     if (!$("optLongNames").checked){
       state.longCount = 0;
       return null;
     }
-    const maxLen = parseInt($("maxLen").value || "40", 10);
+    const threshold = parseInt($("maxLen").value || "40", 10);
 
     const report = [];
     for (const r of rows){
       const originalTitle = String(safeGet(r,"isadg.title") ?? "").trim().replace(/\s+/g, " ");
       if (!originalTitle) continue;
 
-      if (originalTitle.length > maxLen){
+      if (originalTitle.length > threshold){
         const suggestion50 = suggestShortNameKeepExt(originalTitle, CORRECT_MAX_LEN);
         report.push({
           id: safeGet(r,"id"),
@@ -521,8 +521,7 @@
       if (String(safeGet(r,"type")) === "O"){
         const id = String(safeGet(r,"id") ?? "");
         const parent = String(safeGet(r,"parent_id") ?? "");
-        const titleRaw = safeGet(r,"isadg.title");
-        const title = correctedTitle50(titleRaw);
+        const title = correctedTitle50(safeGet(r,"isadg.title"));
         const node = { id, parent_id: parent, title };
         folders.push(node);
         if (id) byId.set(id, node);
@@ -550,9 +549,9 @@
     }
 
     // deterministic order among siblings
-    for (const [k, arr] of children.entries()){
+    for (const [, arr] of children.entries()){
       arr.sort((a,b)=>{
-        const ta = (a.title || "").localeCompare(b.title || "", "fr", {sensitivity:"base"});
+        const ta = (a.title || "").localeCompare(b.title || "", "en", {sensitivity:"base"});
         if (ta !== 0) return ta;
         return (a.id || "").localeCompare(b.id || "");
       });
@@ -577,7 +576,7 @@
       const da = depth.get(a.id) ?? 0;
       const db = depth.get(b.id) ?? 0;
       if (da !== db) return da - db;
-      const t = (a.title || "").localeCompare(b.title || "", "fr", {sensitivity:"base"});
+      const t = (a.title || "").localeCompare(b.title || "", "en", {sensitivity:"base"});
       if (t !== 0) return t;
       return (a.id || "").localeCompare(b.id || "");
     });
@@ -603,7 +602,7 @@
     $("log").textContent = "";
     disableDownloads();
     enableMainButtons(false);
-    setStatus("En attente d’un fichier…");
+    setStatus("Waiting for a file…");
     renderKPIs();
   }
 
@@ -639,9 +638,9 @@
     if (!file) return;
 
     state.fileNameBase = inferBaseName(file.name);
-    setStatus(`Fichier chargé : ${file.name}`);
+    setStatus(`Loaded: ${file.name}`);
     enableMainButtons(true);
-    log(`Chargement: ${file.name}`, "ok");
+    log(`Loaded: ${file.name}`, "ok");
 
     Papa.parse(file, {
       header: true,
@@ -652,14 +651,14 @@
         state.data = res.data || [];
         state.fields = (res.meta && res.meta.fields) ? [...res.meta.fields] : [];
         state.delimiter = (res.meta && res.meta.delimiter) ? res.meta.delimiter : ",";
-        log(`Lignes: ${state.data.length}`, "ok");
-        log(`Colonnes: ${state.fields.length}`, "ok");
-        log(`Délimiteur détecté: "${state.delimiter}"`, "ok");
+        log(`Rows: ${state.data.length}`, "ok");
+        log(`Columns: ${state.fields.length}`, "ok");
+        log(`Detected delimiter: "${state.delimiter}"`, "ok");
         computeTypeCounts(state.data);
         renderKPIs();
       },
       error: (err) => {
-        setStatus("Erreur lecture CSV");
+        setStatus("CSV parsing error");
         log(String(err), "bad");
       }
     });
@@ -671,8 +670,8 @@
     disableDownloads();
     saveOpts();
 
-    log("Traitement…", "ok");
-    setStatus("Traitement en cours…");
+    log("Processing…", "ok");
+    setStatus("Processing…");
 
     const rows = state.data.map(r => ({...r}));
     state.fields = [...(state.fields || [])];
@@ -692,9 +691,9 @@
     state.filesCsv   = buildFilesCsv(rows);
     state.foldersCsv = buildFoldersCsvSorted(rows);
 
-    log(`Modifs appliquées (CSV corrigé): ${state.changedCount}`, "ok");
-    log(`Rapport noms trop longs: ${state.longCount}`, state.longCount ? "warn" : "ok");
-    log(`Correction renommage: titres max ${CORRECT_MAX_LEN} (Files.csv / Folders.csv uniquement)`, "ok");
+    log(`Changes applied (Fixed CSV): ${state.changedCount}`, "ok");
+    log(`Long titles report: ${state.longCount}`, state.longCount ? "warn" : "ok");
+    log(`Renaming correction: titles max ${CORRECT_MAX_LEN} (Files.csv / Folders.csv only)`, "ok");
 
     $("dlFixed").disabled = false;
     $("dlStats").disabled = false;
@@ -703,7 +702,7 @@
     $("dlLong").disabled = !state.longCsv;
     $("dlAll").disabled = false;
 
-    setStatus("Terminé ✅");
+    setStatus("Done ✅");
     renderKPIs();
   });
 
@@ -718,7 +717,7 @@
   });
   $("dlLong").addEventListener("click", () => {
     if (!state.longCsv) return;
-    downloadText(`${state.fileNameBase}_longnames.csv`, state.longCsv);
+    downloadText(`${state.fileNameBase}_long_titles.csv`, state.longCsv);
   });
   $("dlStats").addEventListener("click", () => {
     if (!state.statsCsv) return;
@@ -741,7 +740,7 @@
     const base = state.fileNameBase || "export";
 
     zip.file(`${base}_fixed.csv`, state.fixedCsv || "");
-    if (state.longCsv)  zip.file(`${base}_longnames.csv`, state.longCsv);
+    if (state.longCsv)  zip.file(`${base}_long_titles.csv`, state.longCsv);
     if (state.statsCsv) zip.file(`${base}_stats.csv`, state.statsCsv);
     if (state.filesCsv) zip.file(`Files.csv`, state.filesCsv);
     if (state.foldersCsv) zip.file(`Folders.csv`, state.foldersCsv);
