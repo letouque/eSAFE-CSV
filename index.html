@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CSV Fixer – ARK export</title>
+
+  <!-- PapaParse (CSV parsing) -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#0b0712;
+      --card:#140b24;
+      --card2:#1a0f2f;
+      --text:#f1ecff;
+      --muted:#c7b7ff;
+      --accent:#a876ff;
+      --accent2:#ff77d6;
+      --ok:#5dffb2;
+      --warn:#ffd36b;
+      --bad:#ff6b8a;
+      --border:rgba(255,255,255,.12);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,sans-serif;
+      background: radial-gradient(1200px 600px at 20% 10%, rgba(168,118,255,.18), transparent 60%),
+                  radial-gradient(900px 500px at 70% 30%, rgba(255,119,214,.14), transparent 60%),
+                  var(--bg);
+      color:var(--text);
+    }
+    .wrap{max-width:1100px;margin:0 auto;padding:28px}
+    h1{margin:0 0 10px;font-size:26px}
+    .sub{color:var(--muted);margin:0 0 24px;line-height:1.4}
+    .grid{display:grid;grid-template-columns:1fr;gap:14px}
+    @media(min-width:960px){.grid{grid-template-columns: 1.15fr .85fr}}
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+      border:1px solid var(--border);
+      border-radius:18px;
+      padding:18px;
+      box-shadow: 0 18px 60px rgba(0,0,0,.35);
+      overflow:hidden;
+    }
+    .card h2{margin:0 0 10px;font-size:16px;color:var(--muted);font-weight:650}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .file{
+      border:1px dashed rgba(255,255,255,.25);
+      padding:14px;
+      border-radius:14px;
+      background: rgba(255,255,255,.03);
+      width:100%;
+    }
+    input[type="file"]{width:100%}
+    .opt{display:flex;gap:10px;align-items:flex-start;padding:10px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08)}
+    .opt label{cursor:pointer}
+    .opt small{display:block;color:var(--muted);margin-top:4px}
+    .btn{
+      border:1px solid rgba(255,255,255,.18);
+      background: linear-gradient(90deg, rgba(168,118,255,.25), rgba(255,119,214,.18));
+      color:var(--text);
+      padding:10px 14px;
+      border-radius:14px;
+      cursor:pointer;
+      font-weight:700;
+      transition: transform .05s ease;
+    }
+    .btn:active{transform: translateY(1px)}
+    .btn.secondary{
+      background: rgba(255,255,255,.04);
+    }
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+    .pill{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:8px 10px;border-radius:999px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.03);
+      color:var(--muted);font-size:12px;
+    }
+    .kpi{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:10px}
+    .k{
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.03);
+      border-radius:14px;
+      padding:12px;
+    }
+    .k b{display:block;font-size:18px;margin-bottom:2px}
+    .k span{color:var(--muted);font-size:12px}
+    .log{
+      margin-top:12px;
+      background: rgba(0,0,0,.35);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:14px;
+      padding:12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size:12px;
+      color:rgba(241,236,255,.92);
+      max-height:220px;
+      overflow:auto;
+      white-space:pre-wrap;
+    }
+    .hint{color:var(--muted);font-size:12px;margin-top:8px;line-height:1.4}
+    .ok{color:var(--ok)}
+    .warn{color:var(--warn)}
+    .bad{color:var(--bad)}
+    .tablewrap{
+      margin-top:12px;
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:14px;
+      overflow:hidden;
+      background: rgba(255,255,255,.02);
+    }
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left;vertical-align:top}
+    th{color:var(--muted);font-weight:700;background:rgba(255,255,255,.03)}
+    tr:last-child td{border-bottom:none}
+    .right{justify-content:flex-end}
+    .spacer{height:6px}
+    .footer{opacity:.75;margin-top:14px;font-size:12px;color:var(--muted)}
+    .link{color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>CSV Fixer – ARK export</h1>
+    <p class="sub">
+      Page locale (GitHub Pages) : tu uploades un CSV, tu appliques tes règles, tu télécharges les fichiers corrigés + rapports.
+      Tout se fait dans ton navigateur.
+    </p>
+
+    <div class="grid">
+      <div class="card">
+        <h2>1) Import</h2>
+        <div class="file">
+          <input id="file" type="file" accept=".csv,text/csv" />
+          <div class="hint">
+            Astuce : si Excel casse l’encodage, exporte en UTF-8. PapaParse gère , ; tab.
+          </div>
+        </div>
+
+        <div class="spacer"></div>
+
+        <h2>2) Règles</h2>
+
+        <div class="opt">
+          <input id="optTypeCtoO" type="checkbox" checked />
+          <div>
+            <label for="optTypeCtoO"><b>Remplacer type C → O</b></label>
+            <small>Ton DPS ne gère pas C : on convertit Collection en Folder.</small>
+          </div>
+        </div>
+
+        <div class="opt">
+          <input id="optStripZ" type="checkbox" checked />
+          <div>
+            <label for="optStripZ"><b>Supprimer le “Z” final des dates</b></label>
+            <small>Sur <code>isadg.eventStartDates</code> et <code>isadg.eventEndDates</code> si présents.</small>
+          </div>
+        </div>
+
+        <div class="opt">
+          <input id="optDupFields" type="checkbox" checked />
+          <div>
+            <label for="optDupFields"><b>Dupliquer les champs Dublin Core</b></label>
+            <small>
+              <code>isadg.title → id_display_name</code><br>
+              <code>isadg.title → dc.title</code><br>
+              <code>isadg.identifier → dc.id</code><br>
+              <code>isadg.eventStartDates → dc.date</code>
+            </small>
+          </div>
+        </div>
+
+        <div class="opt">
+          <input id="optLongNames" type="checkbox" checked />
+          <div style="width:100%">
+            <label for="optLongNames"><b>Rapport : noms trop longs</b></label>
+            <small>Détecte les valeurs dépassant une longueur max.</small>
+
+            <div class="row" style="margin-top:10px">
+              <span class="pill">Champ à vérifier</span>
+              <select id="longField" style="padding:8px;border-radius:12px;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.18);color:var(--text)">
+                <option value="isadg.title" selected>isadg.title</option>
+                <option value="id_display_name">id_display_name</option>
+                <option value="id_path">id_path</option>
+                <option value="isadg.identifier">isadg.identifier</option>
+              </select>
+
+              <span class="pill">Max</span>
+              <input id="maxLen" type="number" value="40" min="1" style="width:110px;padding:8px;border-radius:12px;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.18);color:var(--text)" />
+            </div>
+          </div>
+        </div>
+
+        <div class="spacer"></div>
+
+        <div class="row">
+          <button id="run" class="btn" disabled>Traiter le CSV</button>
+          <button id="reset" class="btn secondary" disabled>Réinitialiser</button>
+          <span id="status" class="pill">En attente d’un fichier…</span>
+        </div>
+
+        <div id="log" class="log" aria-live="polite"></div>
+      </div>
+
+      <div class="card">
+        <h2>3) Résultats</h2>
+
+        <div class="row right">
+          <button id="dlFixed" class="btn" disabled>Télécharger CSV corrigé</button>
+          <button id="dlLong" class="btn secondary" disabled>Rapport noms trop longs</button>
+          <button id="dlStats" class="btn secondary" disabled>Rapport stats</button>
+        </div>
+
+        <div class="kpi">
+          <div class="k">
+            <b id="kRows">—</b>
+            <span>Lignes</span>
+          </div>
+          <div class="k">
+            <b id="kCols">—</b>
+            <span>Colonnes</span>
+          </div>
+          <div class="k">
+            <b id="kChanged">—</b>
+            <span>Modifs appliquées</span>
+          </div>
+          <div class="k">
+            <b id="kLong">—</b>
+            <span>Noms trop longs</span>
+          </div>
+        </div>
+
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Count</th>
+              </tr>
+            </thead>
+            <tbody id="typeCounts">
+              <tr><td colspan="2" style="color:var(--muted)">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="footer">
+          Conseil : garde cette page dans ton repo GitHub Pages et ajoute un dossier <code>/samples</code> pour tester.
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  const state = {
+    fileNameBase: null,
+    delimiter: null,
+    data: null,         // array of objects
+    fields: null,       // headers
+    fixedCsv: null,     // string
+    longCsv: null,      // string
+    statsCsv: null,     // string
+    changedCount: 0,
+    longCount: 0,
+    typeCounts: {}
+  };
+
+  function log(msg, cls=""){
+    const el = $("log");
+    const line = cls ? `[${cls.toUpperCase()}] ${msg}` : msg;
+    el.textContent += (el.textContent ? "\n" : "") + line;
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function setStatus(text){
+    $("status").textContent = text;
+  }
+
+  function enableButtons(enabled){
+    $("run").disabled = !enabled;
+    $("reset").disabled = !enabled;
+  }
+
+  function safeGet(row, key){
+    return (row && Object.prototype.hasOwnProperty.call(row, key)) ? row[key] : "";
+  }
+
+  function stripTrailingZ(value){
+    if (typeof value !== "string") return value;
+    return value.endsWith("Z") ? value.slice(0, -1) : value;
+  }
+
+  function downloadText(filename, text){
+    const blob = new Blob([text], {type: "text/csv;charset=utf-8"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function inferBaseName(fileName){
+    const idx = fileName.toLowerCase().lastIndexOf(".csv");
+    return idx > 0 ? fileName.slice(0, idx) : fileName;
+  }
+
+  function renderKPIs(){
+    $("kRows").textContent = state.data ? state.data.length : "—";
+    $("kCols").textContent = state.fields ? state.fields.length : "—";
+    $("kChanged").textContent = state.changedCount ?? "—";
+    $("kLong").textContent = state.longCount ?? "—";
+
+    const tbody = $("typeCounts");
+    tbody.innerHTML = "";
+    const entries = Object.entries(state.typeCounts || {}).sort((a,b)=>b[1]-a[1]);
+    if (!entries.length){
+      tbody.innerHTML = `<tr><td colspan="2" style="color:var(--muted)">—</td></tr>`;
+      return;
+    }
+    for (const [t,c] of entries){
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${t}</td><td>${c}</td>`;
+      tbody.appendChild(tr);
+    }
+  }
+
+  function buildStatsReport(){
+    const rows = [];
+    rows.push({metric:"rows", value: state.data.length});
+    rows.push({metric:"columns", value: state.fields.length});
+    rows.push({metric:"changed_fields_or_values", value: state.changedCount});
+    rows.push({metric:"long_names", value: state.longCount});
+    for (const [t,c] of Object.entries(state.typeCounts)){
+      rows.push({metric:`type_${t}_count`, value:c});
+    }
+    return Papa.unparse(rows, {delimiter: state.delimiter || ","});
+  }
+
+  function computeTypeCounts(rows){
+    const counts = {};
+    for (const r of rows){
+      const t = safeGet(r,"type") || "";
+      counts[t] = (counts[t]||0)+1;
+    }
+    state.typeCounts = counts;
+  }
+
+  function applyRules(rows){
+    state.changedCount = 0;
+
+    const optTypeCtoO = $("optTypeCtoO").checked;
+    const optStripZ = $("optStripZ").checked;
+    const optDupFields = $("optDupFields").checked;
+
+    // Ensure columns exist if we are writing to them
+    const ensureField = (name) => {
+      if (!state.fields.includes(name)) state.fields.push(name);
+    };
+
+    if (optDupFields){
+      ensureField("id_display_name");
+      ensureField("dc.title");
+      ensureField("dc.id");
+      ensureField("dc.date");
+    }
+
+    const dateCols = ["isadg.eventStartDates", "isadg.eventEndDates"];
+
+    for (const r of rows){
+      // 1) type C -> O
+      if (optTypeCtoO && safeGet(r,"type") === "C"){
+        r["type"] = "O";
+        state.changedCount++;
+      }
+
+      // 2) strip trailing Z
+      if (optStripZ){
+        for (const col of dateCols){
+          if (Object.prototype.hasOwnProperty.call(r, col)){
+            const before = r[col];
+            const after = stripTrailingZ(before);
+            if (after !== before){
+              r[col] = after;
+              state.changedCount++;
+            }
+          }
+        }
+      }
+
+      // 3) duplicates
+      if (optDupFields){
+        const title = safeGet(r,"isadg.title");
+        const ident = safeGet(r,"isadg.identifier");
+        const start = safeGet(r,"isadg.eventStartDates");
+
+        if (r["id_display_name"] !== title){ r["id_display_name"] = title; state.changedCount++; }
+        if (r["dc.title"] !== title){ r["dc.title"] = title; state.changedCount++; }
+        if (r["dc.id"] !== ident){ r["dc.id"] = ident; state.changedCount++; }
+        if (r["dc.date"] !== start){ r["dc.date"] = start; state.changedCount++; }
+      }
+    }
+  }
+
+  function buildLongNamesReport(rows){
+    const enabled = $("optLongNames").checked;
+    if (!enabled){
+      state.longCount = 0;
+      return null;
+    }
+    const field = $("longField").value;
+    const maxLen = parseInt($("maxLen").value || "40", 10);
+
+    const report = [];
+    for (const r of rows){
+      const val = String(safeGet(r, field) ?? "").trim();
+      if (val.length > maxLen){
+        report.push({
+          id: safeGet(r,"id"),
+          type: safeGet(r,"type"),
+          parent_id: safeGet(r,"parent_id"),
+          field_checked: field,
+          value: val,
+          length: val.length,
+          isadg_title: safeGet(r,"isadg.title"),
+          id_path: safeGet(r,"id_path"),
+          isadg_identifier: safeGet(r,"isadg.identifier")
+        });
+      }
+    }
+    report.sort((a,b)=>b.length - a.length);
+    state.longCount = report.length;
+    return Papa.unparse(report, {delimiter: state.delimiter || ","});
+  }
+
+  function toCsv(rows){
+    // Papa will output columns based on "columns" if provided.
+    // We keep original headers + any ensured fields.
+    return Papa.unparse(rows, {
+      delimiter: state.delimiter || ",",
+      columns: state.fields
+    });
+  }
+
+  function resetAll(){
+    state.fileNameBase = null;
+    state.delimiter = null;
+    state.data = null;
+    state.fields = null;
+    state.fixedCsv = null;
+    state.longCsv = null;
+    state.statsCsv = null;
+    state.changedCount = 0;
+    state.longCount = 0;
+    state.typeCounts = {};
+    $("log").textContent = "";
+    $("dlFixed").disabled = true;
+    $("dlLong").disabled = true;
+    $("dlStats").disabled = true;
+    enableButtons(false);
+    setStatus("En attente d’un fichier…");
+    renderKPIs();
+  }
+
+  $("file").addEventListener("change", (e) => {
+    resetAll();
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    state.fileNameBase = inferBaseName(file.name);
+    setStatus(`Fichier chargé : ${file.name}`);
+    enableButtons(true);
+    log(`Chargement: ${file.name}`, "ok");
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      dynamicTyping: false,
+      complete: (res) => {
+        state.data = res.data || [];
+        state.fields = (res.meta && res.meta.fields) ? [...res.meta.fields] : [];
+        state.delimiter = (res.meta && res.meta.delimiter) ? res.meta.delimiter : ",";
+        log(`Lignes: ${state.data.length}`, "ok");
+        log(`Colonnes: ${state.fields.length}`, "ok");
+        log(`Délimiteur détecté: "${state.delimiter}"`, "ok");
+        computeTypeCounts(state.data);
+        renderKPIs();
+      },
+      error: (err) => {
+        setStatus("Erreur lecture CSV");
+        log(String(err), "bad");
+      }
+    });
+  });
+
+  $("run").addEventListener("click", () => {
+    if (!state.data) return;
+
+    $("dlFixed").disabled = true;
+    $("dlLong").disabled = true;
+    $("dlStats").disabled = true;
+
+    log("Application des règles…", "ok");
+    setStatus("Traitement en cours…");
+
+    // Work on a deep copy to avoid oddities
+    const rows = state.data.map(r => ({...r}));
+
+    // Fields: keep original, but we may add
+    state.fields = [...(state.fields || [])];
+
+    applyRules(rows);
+    computeTypeCounts(rows);
+
+    state.fixedCsv = toCsv(rows);
+    state.longCsv = buildLongNamesReport(rows);
+    state.statsCsv = buildStatsReport();
+
+    log(`Modifications appliquées: ${state.changedCount}`, "ok");
+    log(`Noms trop longs: ${state.longCount}`, state.longCount ? "warn" : "ok");
+
+    $("dlFixed").disabled = false;
+    $("dlStats").disabled = false;
+    $("dlLong").disabled = !state.longCsv;
+
+    setStatus("Terminé ✅");
+    renderKPIs();
+  });
+
+  $("reset").addEventListener("click", () => resetAll());
+
+  $("dlFixed").addEventListener("click", () => {
+    if (!state.fixedCsv) return;
+    downloadText(`${state.fileNameBase}_fixed.csv`, state.fixedCsv);
+  });
+
+  $("dlLong").addEventListener("click", () => {
+    if (!state.longCsv) return;
+    downloadText(`${state.fileNameBase}_longnames.csv`, state.longCsv);
+  });
+
+  $("dlStats").addEventListener("click", () => {
+    if (!state.statsCsv) return;
+    downloadText(`${state.fileNameBase}_stats.csv`, state.statsCsv);
+  });
+
+  // init
+  resetAll();
+</script>
+</body>
+</html>
