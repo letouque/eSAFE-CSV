@@ -11,9 +11,6 @@
   <!-- Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-
-  <!-- App -->
-  <script defer src="js/app.js"></script>
 </head>
 
 <body>
@@ -69,9 +66,9 @@
           </div>
         </div>
 
-        <!-- ✅ NEW: Remove id_path option for Fixed CSV -->
+        <!-- ✅ Remove id_path option for Fixed CSV -->
         <div class="opt">
-          <input id="optRemoveIdPath" type="checkbox" />
+          <input id="optRemoveIdPath" type="checkbox" checked />
           <div>
             <label for="optRemoveIdPath"><b>Remove id_path column</b></label>
             <small>id_path is not required in the Fixed CSV export.</small>
@@ -121,11 +118,12 @@
           <input id="optLongNames" type="checkbox" checked />
           <div style="width:100%">
             <label for="optLongNames"><b>Report: titles too long</b></label>
-            <small>Detects titles longer than the threshold below.</small>
+            <small>Detects titles longer than the threshold below. The report now includes <code>original_title</code> and <code>suggested_title (N)</code>.</small>
 
             <div class="row" style="margin-top:10px">
               <span class="pill">Threshold</span>
-              <input id="maxLen" type="number" value="40" min="1" style="width:110px">
+              <!-- ✅ default is now 80 -->
+              <input id="maxLen" type="number" value="80" min="1" style="width:110px">
             </div>
           </div>
         </div>
@@ -174,10 +172,15 @@
 
         <div class="footer">
           Encoding: UTF-8 (Excel-friendly, BOM included).<br>
-          Original delimiter preserved for <b>Fixed CSV</b> and reports. <b>Files.csv</b> &amp; <b>Folders.csv</b> use commas.
+          Original delimiter preserved for <b>Fixed CSV</b> and reports.
+          <b>Files.csv</b> &amp; <b>Folders.csv</b> use commas and include:
+          <code>ID</code>, <code>suggested_title (N)</code>, <code>original_title</code>.
         </div>
       </div>
     </div>
   </div>
+
+  <!-- App -->
+  <script src="js/app.js"></script>
 </body>
 </html>
