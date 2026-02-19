@@ -42,30 +42,49 @@ function stripTrailingZ(value){
 }
 
 // ---------------- Renaming engine
+
+// Removes ANY chain of FW / FWD / RE / FROM / TO prefixes, even with "_" or "-" or weird spacing.
 function cleanEmailPrefixes(name) {
   if (!name) return "";
-  // FIXED: remove multiple prefixes; supports :, -, _, spaces, en dash
-  return name.replace(/^((fw|fwd|re|from|to)[\s:_\-–]*)+/i, "").trim();
+
+  // Remove leading noise (quotes, brackets, arrows, dashes, spaces)
+  let x = name.replace(/^[\s"'`«»\[\]\(\)\{\}>-]+/, "");
+
+  // Loop: strip multiple prefixes at start
+  const re = /^(?:\s*(fw|fwd|re|from|to)\s*[:_\-–]*\s*)/i;
+  while (re.test(x)) {
+    x = x.replace(re, "");
+  }
+
+  return x.trimStart();
 }
+
 function extractEmailSubject(name) {
   const parts = name.split(":");
   return parts.length > 1 ? parts.slice(1).join(":").trim() : name;
 }
-function normalizeSpaces(name) { return name.trim().replace(/\s+/g, " "); }
-function removeSpecialChars(name) { return name.replace(/[^0-9A-Za-zÀ-ÖØ-öø-ÿ _-]+/g, ""); }
 
-function shortenSmart(name, ext, maxLen) {
+function normalizeSpaces(name) { return name.trim().replace(/\s+/g, " "); }
+
+function removeSpecialChars(name) {
+  return name.replace(/[^0-9A-Za-zÀ-ÖØ-öø-ÿ _-]+/g, "");
+}
+
+function shortenSmart(base, ext, maxLen) {
   const ell = "…";
-  const full = name + ext;
+  const full = base + ext;
   if (full.length <= maxLen) return full;
 
   const maxBase = maxLen - ext.length - ell.length;
   if (maxBase <= 0) return full.slice(0, maxLen);
 
-  let short = name.slice(0, maxBase);
+  let short = base.slice(0, maxBase);
+
   const lastSpace = short.lastIndexOf(" ");
   if (lastSpace > maxBase * 0.6) short = short.slice(0, lastSpace);
+
   short = short.replace(/[\s._-]+$/, "");
+
   return short + ell + ext;
 }
 
@@ -73,14 +92,22 @@ function smartRename(original, opts) {
   if (!opts.enabled) return original || "";
   if (!original) return "";
 
+  // Always normalize unicode first
   let name = String(original).normalize("NFC");
 
+  // 1) Strip prefixes BEFORE modifying characters
   if (opts.stripEmail) name = cleanEmailPrefixes(name);
-  if (opts.subjectOnly) name = extractEmailSubject(name);
-  if (opts.cleanSpaces) name = normalizeSpaces(name);
-  if (opts.noSpecial)   name = removeSpecialChars(name);
 
-  // Safe extension handling: last dot, not first or last char
+  // 2) Optional subject extraction
+  if (opts.subjectOnly) name = extractEmailSubject(name);
+
+  // 3) Normalize spaces
+  if (opts.cleanSpaces) name = normalizeSpaces(name);
+
+  // 4) Remove special chars after cleaning prefixes
+  if (opts.noSpecial) name = removeSpecialChars(name);
+
+  // 5) Safe extension handling
   const dot = name.lastIndexOf(".");
   let base = name, ext = "";
   if (dot > 0 && dot < name.length - 1) {
@@ -88,7 +115,7 @@ function smartRename(original, opts) {
     ext  = name.slice(dot);
   }
 
-  // Max length applies to full "base + ext"
+  // 6) Apply max length
   const maxLen = parseInt(opts.maxLen || "50", 10);
   return shortenSmart(base, ext, maxLen);
 }
@@ -125,6 +152,7 @@ function computeTypeCounts(rows){
   }
   state.typeCounts = counts;
 }
+
 function renderKPIs(){
   $("kRows").textContent = state.data ? state.data.length : "—";
   $("kCols").textContent = state.fields ? state.fields.length : "—";
@@ -140,10 +168,11 @@ function renderKPIs(){
   }
   for (const [t,c] of entries){
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${t || "(empty)"}</td><td>${c}</td>`;
+    tr.innerHTML = `<td>${t || "(empty)"}<\/td><td>${c}<\/td>`;
     tbody.appendChild(tr);
   }
 }
+
 function buildStatsReport(){
   const rows = [
     {metric:"rows", value: state.data.length},
@@ -157,7 +186,7 @@ function buildStatsReport(){
   return Papa.unparse(rows, {delimiter: state.delimiter});
 }
 
-// ---------------- Core fix rules (for Fixed CSV logic base)
+// ---------------- Core fix rules (base for all outputs)
 function applyRules(rows){
   state.changedCount = 0;
 
@@ -179,6 +208,7 @@ function applyRules(rows){
   const dateCols = ["isadg.eventStartDates", "isadg.eventEndDates"];
 
   for (const r of rows){
+
     if (optTypeCtoO && safeGet(r,"type") === "C"){
       r["type"] = "O";
       state.changedCount++;
@@ -186,13 +216,11 @@ function applyRules(rows){
 
     if (optStripZ){
       for (const col of dateCols){
-        if (Object.prototype.hasOwnProperty.call(r, col)){
-          const before = r[col];
-          const after  = stripTrailingZ(before);
-          if (after !== before){
-            r[col] = after;
-            state.changedCount++;
-          }
+        const before = r[col];
+        const after  = stripTrailingZ(before);
+        if (after !== before){
+          r[col] = after;
+          state.changedCount++;
         }
       }
     }
@@ -210,24 +238,20 @@ function applyRules(rows){
   }
 }
 
-function toCsv(rows, columns){
-  return Papa.unparse(rows, {
-    delimiter: state.delimiter || ",",
-    columns: columns || state.fields
-  });
-}
-
-// ---------------- Long titles report
+// ---------------- Long title report
 function buildLongNamesReport(rows){
   if (!$("optLongNames").checked){
     state.longCount = 0;
     return null;
   }
+
   const threshold = parseInt($("maxLen").value || "40", 10);
   const report = [];
+
   for (const r of rows){
     const original = String(safeGet(r,"isadg.title") ?? "").trim().replace(/\s+/g, " ");
     if (!original) continue;
+
     if (original.length > threshold){
       const suggestion = correctedTitle(original);
       report.push({
@@ -243,17 +267,23 @@ function buildLongNamesReport(rows){
       });
     }
   }
+
   report.sort((a,b)=>b.title_length - a.title_length);
   state.longCount = report.length;
-  return Papa.unparse(report, {delimiter: state.delimiter || ","});
+
+  return Papa.unparse(report, {delimiter: state.delimiter});
 }
 
-// ---------------- Files.csv / Folders.csv (renaming applied)
+// ---------------- Files.csv / Folders.csv
+
 function buildFilesCsv(rows){
   const out = [];
   for (const r of rows){
     if (String(safeGet(r,"type")) === "F"){
-      out.push({ ID: safeGet(r,"id"), title: correctedTitle(safeGet(r,"isadg.title")) });
+      out.push({
+        ID: safeGet(r,"id"),
+        title: correctedTitle(safeGet(r,"isadg.title"))
+      });
     }
   }
   return Papa.unparse(out, {delimiter: ","});
@@ -265,12 +295,13 @@ function buildFoldersCsvSorted(rows){
 
   for (const r of rows){
     if (String(safeGet(r,"type")) === "O"){
-      const id = String(safeGet(r,"id") ?? "");
-      const parent = String(safeGet(r,"parent_id") ?? "");
-      const title = correctedTitle(safeGet(r,"isadg.title"));
-      const node = { id, parent_id: parent, title };
+      const node = {
+        id: String(safeGet(r,"id") ?? ""),
+        parent_id: String(safeGet(r,"parent_id") ?? ""),
+        title: correctedTitle(safeGet(r,"isadg.title"))
+      };
       folders.push(node);
-      if (id) byId.set(id, node);
+      if (node.id) byId.set(node.id, node);
     }
   }
 
@@ -295,11 +326,11 @@ function buildFoldersCsvSorted(rows){
     children.get(p).push(n);
   }
 
-  for (const [, arr] of children.entries()){
+  for (const [,arr] of children){
     arr.sort((a,b)=>{
-      const ta = (a.title || "").localeCompare(b.title || "", "en", {sensitivity:"base"});
+      const ta = a.title.localeCompare(b.title, "en", {sensitivity:"base"});
       if (ta !== 0) return ta;
-      return (a.id || "").localeCompare(b.id || "");
+      return a.id.localeCompare(b.id);
     });
   }
 
@@ -319,29 +350,34 @@ function buildFoldersCsvSorted(rows){
   }
 
   folders.sort((a,b)=>{
-    const da = depth.get(a.id) ?? 0;
-    const db = depth.get(b.id) ?? 0;
+    const da = depth.get(a.id);
+    const db = depth.get(b.id);
     if (da !== db) return da - db;
-    const t = (a.title || "").localeCompare(b.title || "", "en", {sensitivity:"base"});
+
+    const t = a.title.localeCompare(b.title, "en", {sensitivity:"base"});
     if (t !== 0) return t;
-    return (a.id || "").localeCompare(b.id || "");
+
+    return a.id.localeCompare(b.id);
   });
 
-  const out = folders.map(f => ({ID: f.id, title: f.title}));
-  return Papa.unparse(out, {delimiter: ","});
+  return Papa.unparse(
+    folders.map(f => ({ID: f.id, title: f.title})),
+    {delimiter: ","}
+  );
 }
 
-// ---------------- Build Fixed CSV with optional id_path removal (without mutating rows used by reports)
+// ---------------- Build Fixed CSV (optional id_path removal)
 function buildFixedCsv(rows) {
   const removeIdPath = $("optRemoveIdPath").checked;
 
-  // Copy rows and fields for fixed output only
+  // Copy rows
   const rowsForFixed = rows.map(r => {
     const o = { ...r };
     if (removeIdPath) delete o["id_path"];
     return o;
   });
 
+  // Copy fields
   let fieldsForFixed = [...(state.fields || [])];
   if (removeIdPath) {
     fieldsForFixed = fieldsForFixed.filter(f => f !== "id_path");
@@ -349,7 +385,7 @@ function buildFixedCsv(rows) {
   }
 
   return Papa.unparse(rowsForFixed, {
-    delimiter: state.delimiter || ",",
+    delimiter: state.delimiter,
     columns: fieldsForFixed
   });
 }
@@ -387,7 +423,10 @@ $("file").addEventListener("change", (e) => {
   log(`Loaded: ${file.name}`, "ok");
 
   Papa.parse(file, {
-    header: true, skipEmptyLines: true, dynamicTyping: false, worker: true,
+    header: true,
+    skipEmptyLines: true,
+    dynamicTyping: false,
+    worker: true,
     complete: (res) => {
       state.data = res.data || [];
       state.fields = res.meta?.fields ? [...res.meta.fields] : [];
@@ -415,18 +454,14 @@ $("run").addEventListener("click", async () => {
   const rows = state.data.map(r => ({...r}));
   state.fields = [...(state.fields || [])];
 
-  // Apply rules to rows (base for all outputs)
   applyRules(rows);
-
-  // Recompute counts after any type changes
   computeTypeCounts(rows);
 
-  // Build outputs
-  state.fixedCsv   = buildFixedCsv(rows);       // ✅ uses optional id_path removal
+  state.fixedCsv   = buildFixedCsv(rows);
   state.longCsv    = buildLongNamesReport(rows);
   state.statsCsv   = buildStatsReport();
-  state.filesCsv   = buildFilesCsv(rows);       // renaming applied
-  state.foldersCsv = buildFoldersCsvSorted(rows); // renaming applied
+  state.filesCsv   = buildFilesCsv(rows);
+  state.foldersCsv = buildFoldersCsvSorted(rows);
 
   log(`Changes applied (Fixed CSV): ${state.changedCount}`, "ok");
   log(`Long titles report: ${state.longCount}`, state.longCount ? "warn" : "ok");
@@ -448,28 +483,21 @@ $("reset").addEventListener("click", () => {
 });
 
 $("dlFixed").addEventListener("click", () => {
-  if (!state.fixedCsv) return;
-  downloadText(`${state.fileNameBase}_fixed.csv`, state.fixedCsv);
+  if (state.fixedCsv) downloadText(`${state.fileNameBase}_fixed.csv`, state.fixedCsv);
 });
 $("dlLong").addEventListener("click", () => {
-  if (!state.longCsv) return;
-  downloadText(`${state.fileNameBase}_long_titles.csv`, state.longCsv);
+  if (state.longCsv) downloadText(`${state.fileNameBase}_long_titles.csv`, state.longCsv);
 });
 $("dlStats").addEventListener("click", () => {
-  if (!state.statsCsv) return;
-  downloadText(`${state.fileNameBase}_stats.csv`, state.statsCsv);
+  if (state.statsCsv) downloadText(`${state.fileNameBase}_stats.csv`, state.statsCsv);
 });
 $("dlFiles").addEventListener("click", () => {
-  if (!state.filesCsv) return;
-  downloadText(`Files.csv`, state.filesCsv);
+  if (state.filesCsv) downloadText(`Files.csv`, state.filesCsv);
 });
 $("dlFolders").addEventListener("click", () => {
-  if (!state.foldersCsv) return;
-  downloadText(`Folders.csv`, state.foldersCsv);
+  if (state.foldersCsv) downloadText(`Folders.csv`, state.foldersCsv);
 });
 $("dlAll").addEventListener("click", async () => {
-  if (!state.fixedCsv && !state.longCsv && !state.statsCsv && !state.filesCsv && !state.foldersCsv) return;
-
   const zip = new JSZip();
   const base = state.fileNameBase || "export";
 
@@ -482,8 +510,11 @@ $("dlAll").addEventListener("click", async () => {
   const blob = await zip.generateAsync({ type: "blob" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url; a.download = `${base}_exports.zip`;
-  document.body.appendChild(a); a.click(); a.remove();
+  a.href = url;
+  a.download = `${base}_exports.zip`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
   URL.revokeObjectURL(url);
 });
 
