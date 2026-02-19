@@ -1,35 +1,35 @@
-// eSAFE CSV Tool – Renaming Engine + Reports + id_path removal (FINAL FIXED VERSION)
+// eSAFE CSV Tool – Final stable version with prefix fixes, extension preservation,
+// id_path removal, Files/Folders with suggested+original, and full report integration.
 
-// Short helper
 const $ = (id) => document.getElementById(id);
 
-// State
+// Global state
 const state = {
   fileNameBase: null,
   delimiter: ",",
   data: null,
   fields: null,
-  // outputs
+
   fixedCsv: null,
   longCsv: null,
   statsCsv: null,
   filesCsv: null,
   foldersCsv: null,
-  // stats
+
   changedCount: 0,
   longCount: 0,
   typeCounts: {}
 };
 
-// -------- UI helpers
+// UI helpers
 function log(msg, cls = "") {
   const el = $("log");
   const line = cls ? `[${cls.toUpperCase()}] ${msg}` : msg;
   el.textContent += (el.textContent ? "\n" : "") + line;
   el.scrollTop = el.scrollHeight;
 }
-function setStatus(text){ $("status").textContent = text; }
-function enableMainButtons(ok){ $("run").disabled = !ok; $("reset").disabled = !ok; }
+function setStatus(t){ $("status").textContent = t; }
+function enableMainButtons(v){ $("run").disabled = !v; $("reset").disabled = !v; }
 function disableDownloads(){
   $("dlFixed").disabled = true;
   $("dlLong").disabled = true;
@@ -38,48 +38,48 @@ function disableDownloads(){
   $("dlFolders").disabled = true;
   $("dlAll").disabled = true;
 }
-function safeGet(row, key){ return (row && Object.prototype.hasOwnProperty.call(row, key)) ? row[key] : ""; }
-function inferBaseName(fileName){ const i = fileName.toLowerCase().lastIndexOf(".csv"); return i > 0 ? fileName.slice(0, i) : fileName; }
+function safeGet(r,k){ return (r && Object.prototype.hasOwnProperty.call(r,k)) ? r[k] : ""; }
+function inferBaseName(fn){ const i = fn.toLowerCase().lastIndexOf(".csv"); return i>0 ? fn.slice(0,i) : fn; }
 
-// -------- CSV helpers
-function stripTrailingZ(value){
-  return (typeof value === "string" && value.endsWith("Z")) ? value.slice(0, -1) : value;
+// CSV helpers
+function stripTrailingZ(x){
+  return (typeof x==="string" && x.endsWith("Z")) ? x.slice(0,-1) : x;
 }
 
-// -------- Renaming engine
-
-// Remove FW / FWD / RE / FROM / TO prefixes at the very start (with separators)
+// ------------------------------
+//  RENAMING ENGINE (final)
+// ------------------------------
 function cleanEmailPrefixes(name) {
   if (!name) return "";
 
-  // Remove leading noise (quotes, brackets, arrows, spaces, punctuation)
+  // Remove bracket/quote/dash noise before prefixes
   let x = name.replace(/^[\s"'`«»\[\]\(\)\{\}>-]+/, "");
 
-  // IMPORTANT: longest tokens FIRST → prevents “d_” left from “Fwd_”
+  // Longest tokens FIRST (fixes "d_" bug from "Fwd_")
   const re = /^(?:\s*(fwd|fw|re|from|to)\s*[:_\-–]*\s*)/i;
 
-  // Remove chains: “Re_ Fwd_ FW: Fwd- …”
+  // Remove repeated prefix chains
   while (re.test(x)) x = x.replace(re, "");
 
-  // Clean leftover separators after stripping
+  // Remove leftover separators
   x = x.replace(/^[\s:_\-–]+/, "");
 
   return x.trimStart();
 }
 
-function extractEmailSubject(name) {
+function extractEmailSubject(name){
   const parts = name.split(":");
   return parts.length > 1 ? parts.slice(1).join(":").trim() : name;
 }
 
-function normalizeSpaces(name) { return name.trim().replace(/\s+/g, " "); }
+function normalizeSpaces(n){ return n.trim().replace(/\s+/g," "); }
 
-function removeSpecialChars(name) {
-  // Clean ONLY the base (extension handled separately)
-  return name.replace(/[^0-9A-Za-zÀ-ÖØ-öø-ÿ _-]+/g, "");
+function removeSpecialChars(n){
+  // ONLY touches basename, extension handled separately
+  return n.replace(/[^0-9A-Za-zÀ-ÖØ-öø-ÿ _-]+/g,"");
 }
 
-function shortenSmart(base, ext, maxLen) {
+function shortenSmart(base, ext, maxLen){
   const ell = "…";
   const full = base + ext;
   if (full.length <= maxLen) return full;
@@ -88,46 +88,40 @@ function shortenSmart(base, ext, maxLen) {
   if (maxBase <= 0) return full.slice(0, maxLen);
 
   let short = base.slice(0, maxBase);
-
   const lastSpace = short.lastIndexOf(" ");
-  if (lastSpace > maxBase * 0.6) short = short.slice(0, lastSpace);
+  if (lastSpace > maxBase*0.6) short = short.slice(0,lastSpace);
 
-  short = short.replace(/[\s._-]+$/, "");
+  short = short.replace(/[\s._-]+$/,"");
   return short + ell + ext;
 }
 
-function smartRename(original, opts) {
+function smartRename(original, opts){
   if (!opts.enabled) return original || "";
   if (!original) return "";
 
-  // Normalize Unicode
   let name = String(original).normalize("NFC");
 
-  // 1) Strip prefixes before modifying separators
   if (opts.stripEmail) name = cleanEmailPrefixes(name);
-
-  // 2) Subject extraction
   if (opts.subjectOnly) name = extractEmailSubject(name);
 
-  // 3) Split extension BEFORE ANY CLEANING
+  // EXTENSION PRESERVATION (before cleaning)
   let base = name;
   let ext = "";
   const dot = name.lastIndexOf(".");
   if (dot > 0 && dot < name.length - 1) {
     base = name.slice(0, dot);
-    ext  = name.slice(dot); // includes "."
+    ext  = name.slice(dot);   // keep ".txt"
   }
 
-  // 4) Clean ONLY the base
+  // Clean base
   if (opts.cleanSpaces) base = normalizeSpaces(base);
   if (opts.noSpecial)   base = removeSpecialChars(base);
 
-  // 5) Apply max length to base+ext
-  const maxLen = parseInt(opts.maxLen || "50", 10);
+  const maxLen = parseInt(opts.maxLen || "50",10);
   return shortenSmart(base, ext, maxLen);
 }
 
-function correctedTitle(val) {
+function correctedTitle(raw){
   const opts = {
     enabled: $("optRename").checked,
     maxLen: $("renameMaxLen").value,
@@ -136,355 +130,433 @@ function correctedTitle(val) {
     cleanSpaces: $("renameCleanSpaces").checked,
     noSpecial: $("renameNoSpecial").checked
   };
-  return smartRename(String(val ?? ""), opts);
+  return smartRename(String(raw ?? ""), opts);
 }
 
-// Dynamic header for suggested title
+// Header for suggested title (dynamic)
 function suggestedHeader() {
-  const n = parseInt(($("renameMaxLen")?.value || "50"), 10);
-  return `suggested_title (${isFinite(n) && n > 0 ? n : 50})`;
+  const n = parseInt($("renameMaxLen").value || "50",10);
+  return `suggested_title (${n})`;
 }
 
-// -------- Download
+// Downloads
 function downloadText(filename, text){
   const bom = "\uFEFF";
-  const blob = new Blob([bom + text], {type: "text/csv;charset=utf-8"});
-  const url = URL.createObjectURL(blob);
+  const blob = new Blob([bom+text],{type:"text/csv;charset=utf-8"});
+  const url  = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url; a.download = filename;
-  document.body.appendChild(a); a.click(); a.remove();
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
   URL.revokeObjectURL(url);
 }
 
-// -------- Stats
+// Stats
 function computeTypeCounts(rows){
-  const counts = {};
+  const c={};
   for (const r of rows){
-    const t = String(safeGet(r,"type") || "");
-    counts[t] = (counts[t] || 0) + 1;
+    const t = String(safeGet(r,"type")||"");
+    c[t] = (c[t]||0)+1;
   }
-  state.typeCounts = counts;
+  state.typeCounts = c;
 }
 
 function renderKPIs(){
   $("kRows").textContent = state.data ? state.data.length : "—";
   $("kCols").textContent = state.fields ? state.fields.length : "—";
-  $("kChanged").textContent = (state.changedCount ?? "—");
-  $("kLong").textContent = (state.longCount ?? "—");
+  $("kChanged").textContent = state.changedCount ?? "—";
+  $("kLong").textContent = state.longCount ?? "—";
 
-  const tbody = $("typeCounts");
-  tbody.innerHTML = "";
-  const entries = Object.entries(state.typeCounts || {}).sort((a,b)=>b[1]-a[1]);
-  if (!entries.length){
-    tbody.innerHTML = `<tr><td colspan="2" style="color:var(--muted)">—</td></tr>`;
+  const tb = $("typeCounts");
+  tb.innerHTML = "";
+  const ent = Object.entries(state.typeCounts).sort((a,b)=>b[1]-a[1]);
+  if (!ent.length){
+    tb.innerHTML = `<tr><td colspan="2" style="color:var(--muted)">—</td></tr>`;
     return;
   }
-  for (const [t,c] of entries){
+  for (const [t,c] of ent){
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${t || "(empty)"}<\/td><td>${c}<\/td>`;
-    tbody.appendChild(tr);
+    tr.innerHTML = `<td>${t||"(empty)"}<\/td><td>${c}<\/td>`;
+    tb.appendChild(tr);
   }
 }
 
 function buildStatsReport(){
   const rows = [
-    {metric:"rows", value: state.data.length},
-    {metric:"columns", value: state.fields.length},
-    {metric:"changes_applied", value: state.changedCount},
-    {metric:"long_titles_report_count", value: state.longCount}
+    {metric:"rows",value:state.data.length},
+    {metric:"columns",value:state.fields.length},
+    {metric:"changes_applied",value:state.changedCount},
+    {metric:"long_titles_report_count",value:state.longCount}
   ];
   for (const [t,c] of Object.entries(state.typeCounts)){
-    rows.push({metric:`type_${t || "empty"}_count`, value:c});
+    rows.push({metric:`type_${t||"empty"}_count`,value:c});
   }
-  return Papa.unparse(rows, {delimiter: state.delimiter});
+  return Papa.unparse(rows,{delimiter:state.delimiter});
 }
 
-// -------- Core fix rules (base for all outputs)
+// Core transformations (for fixed CSV)
 function applyRules(rows){
   state.changedCount = 0;
 
   const optTypeCtoO = $("optTypeCtoO").checked;
   const optStripZ   = $("optStripZ").checked;
-  const optDupFields= $("optDupFields").checked;
+  const optDup      = $("optDupFields").checked;
 
-  const ensureField = (name) => {
-    if (!state.fields.includes(name)) state.fields.push(name);
-  };
+  const ensure = n => { if (!state.fields.includes(n)) state.fields.push(n); };
 
-  if (optDupFields){
-    ensureField("id_display_name");
-    ensureField("dc.title");
-    ensureField("dc.id");
-    ensureField("dc.date");
+  if (optDup){
+    ensure("id_display_name");
+    ensure("dc.title");
+    ensure("dc.id");
+    ensure("dc.date");
   }
 
-  const dateCols = ["isadg.eventStartDates", "isadg.eventEndDates"];
+  const dateCols = ["isadg.eventStartDates","isadg.eventEndDates"];
 
   for (const r of rows){
-
-    if (optTypeCtoO && safeGet(r,"type") === "C"){
-      r["type"] = "O";
+    if (optTypeCtoO && safeGet(r,"type")==="C"){
+      r["type"]="O";
       state.changedCount++;
     }
-
     if (optStripZ){
       for (const col of dateCols){
-        const before = r[col];
-        const after  = stripTrailingZ(before);
-        if (after !== before){
-          r[col] = after;
-          state.changedCount++;
-        }
+        const b=r[col], a=stripTrailingZ(b);
+        if (a!==b){ r[col]=a; state.changedCount++; }
       }
     }
+    if (optDup){
+      const t=safeGet(r,"isadg.title");
+      const id=safeGet(r,"isadg.identifier");
+      const dt=safeGet(r,"isadg.eventStartDates");
 
-    if (optDupFields){
-      const title = safeGet(r,"isadg.title");
-      const ident = safeGet(r,"isadg.identifier");
-      const start = safeGet(r,"isadg.eventStartDates");
-
-      if (r["id_display_name"] !== title){ r["id_display_name"] = title; state.changedCount++; }
-      if (r["dc.title"] !== title){ r["dc.title"] = title; state.changedCount++; }
-      if (r["dc.id"] !== ident){ r["dc.id"] = ident; state.changedCount++; }
-      if (r["dc.date"] !== start){ r["dc.date"] = start; state.changedCount++; }
+      if (r["id_display_name"]!==t){ r["id_display_name"]=t; state.changedCount++; }
+      if (r["dc.title"]!==t){ r["dc.title"]=t; state.changedCount++; }
+      if (r["dc.id"]!==id){ r["dc.id"]=id; state.changedCount++; }
+      if (r["dc.date"]!==dt){ r["dc.date"]=dt; state.changedCount++; }
     }
   }
 }
 
 function toCsv(rows, columns){
-  return Papa.unparse(rows, {
-    delimiter: state.delimiter || ",",
-    columns: columns || state.fields
+  return Papa.unparse(rows,{
+    delimiter:state.delimiter||",",
+    columns:columns||state.fields
   });
 }
 
-// -------- Long titles report (with original + suggested)
+// Long titles report (with suggested + original)
 function buildLongNamesReport(rows){
   if (!$("optLongNames").checked){
-    state.longCount = 0;
+    state.longCount=0;
     return null;
   }
-  const threshold = parseInt($("maxLen").value || "80", 10);
-  const colSuggested = suggestedHeader();
 
-  const report = [];
+  const threshold = parseInt($("maxLen").value||"80",10);
+  const colSug = suggestedHeader();
+  const out = [];
+
   for (const r of rows){
-    const original = String(safeGet(r,"isadg.title") ?? "").trim().replace(/\s+/g, " ");
+    const original = String(safeGet(r,"isadg.title")??"").trim().replace(/\s+/g," ");
     if (!original) continue;
 
     if (original.length > threshold){
       const suggested = correctedTitle(original);
-      report.push({
+      out.push({
         id: safeGet(r,"id"),
         type: safeGet(r,"type"),
         parent_id: safeGet(r,"parent_id"),
+
         original_title: original,
         title_length: original.length,
-        [colSuggested]: suggested,
+
+        [colSug]: suggested,
         suggested_length: suggested.length,
+
         id_path: safeGet(r,"id_path"),
         isadg_identifier: safeGet(r,"isadg.identifier")
       });
     }
   }
 
-  report.sort((a,b)=>b.title_length - a.title_length);
-  state.longCount = report.length;
+  out.sort((a,b)=>b.title_length-a.title_length);
+  state.longCount = out.length;
 
-  const columns = [
+  const cols = [
     "id","type","parent_id",
     "original_title","title_length",
-    colSuggested,"suggested_length",
+    colSug,"suggested_length",
     "id_path","isadg_identifier"
   ];
 
-  return Papa.unparse(report, { delimiter: state.delimiter, columns });
+  return Papa.unparse(out,{delimiter:state.delimiter,columns:cols});
 }
 
-// -------- Files.csv / Folders.csv with suggested + original
-function buildFilesCsv(rows) {
-  const colSuggested = suggestedHeader();
+// Files.csv
+function buildFilesCsv(rows){
+  const colSug = suggestedHeader();
   const out = [];
 
-  for (const r of rows) {
-    if (String(safeGet(r, "type")) === "F") {
-      const original = String(safeGet(r, "isadg.title") ?? "");
-      const suggested = correctedTitle(original);
+  for (const r of rows){
+    if (String(safeGet(r,"type"))==="F"){
+      const orig = String(safeGet(r,"isadg.title")??"");
+      const sug  = correctedTitle(orig);
       out.push({
-        ID: safeGet(r, "id"),
-        [colSuggested]: suggested,
-        original_title: original
+        ID: safeGet(r,"id"),
+        [colSug]: sug,
+        original_title: orig
       });
     }
   }
 
-  return Papa.unparse(out, {
-    delimiter: ",",
-    columns: ["ID", colSuggested, "original_title"]
+  return Papa.unparse(out,{
+    delimiter:",",
+    columns:["ID",colSug,"original_title"]
   });
 }
 
-function buildFoldersCsvSorted(rows) {
-  const colSuggested = suggestedHeader();
-
-  // Collect folders with suggested & original
+// Folders.csv
+function buildFoldersCsvSorted(rows){
+  const colSug = suggestedHeader();
   const folders = [];
   const byId = new Map();
 
-  for (const r of rows) {
-    if (String(safeGet(r, "type")) === "O") {
-      const id = String(safeGet(r, "id") ?? "");
-      const parent = String(safeGet(r, "parent_id") ?? "");
-      const original = String(safeGet(r, "isadg.title") ?? "");
-      const suggested = correctedTitle(original);
-      const node = { id, parent_id: parent, suggested, original };
+  // Collect
+  for (const r of rows){
+    if (String(safeGet(r,"type"))==="O"){
+      const id = String(safeGet(r,"id")||"");
+      const parent = String(safeGet(r,"parent_id")||"");
+      const orig = String(safeGet(r,"isadg.title")||"");
+      const sug  = correctedTitle(orig);
+      const node = {id,parent_id:parent,suggested:sug,original:orig};
       folders.push(node);
-      if (id) byId.set(id, node);
+      if (id) byId.set(id,node);
     }
   }
 
-  // Roots: parent missing or unknown
-  const roots = [];
-  for (const n of folders) {
-    const p = (n.parent_id || "").trim();
+  // Roots
+  const roots=[];
+  for (const n of folders){
+    const p=(n.parent_id||"").trim();
     if (!p || !byId.has(p)) roots.push(n);
   }
 
-  // BFS depth calc
-  const depth = new Map();
-  const q = [];
-  for (const r of roots) {
-    depth.set(r.id, 0);
-    q.push(r);
+  // BFS depth
+  const depth=new Map();
+  const q=[];
+  for (const r of roots){
+    depth.set(r.id,0); q.push(r);
   }
 
-  const children = new Map();
-  for (const n of folders) {
-    const p = (n.parent_id || "").trim();
-    if (!children.has(p)) children.set(p, []);
+  const children=new Map();
+  for (const n of folders){
+    const p=(n.parent_id||"").trim();
+    if (!children.has(p)) children.set(p,[]);
     children.get(p).push(n);
   }
 
-  // Deterministic sibling order by suggested, then id
-  for (const [, arr] of children) {
-    arr.sort((a, b) => {
-      const t = (a.suggested || "").localeCompare((b.suggested || ""), "en", { sensitivity: "base" });
-      return t !== 0 ? t : (a.id || "").localeCompare(b.id || "");
+  // Sort siblings by suggested, then id
+  for (const [,arr] of children){
+    arr.sort((a,b)=>{
+      const t = a.suggested.localeCompare(b.suggested,"en",{sensitivity:"base"});
+      return t!==0 ? t : a.id.localeCompare(b.id);
     });
   }
 
-  while (q.length) {
-    const cur = q.shift();
-    const kids = children.get(cur.id) || [];
-    for (const child of kids) {
-      if (!depth.has(child.id)) {
-        depth.set(child.id, (depth.get(cur.id) ?? 0) + 1);
-        q.push(child);
+  // BFS assign depths
+  while(q.length){
+    const cur=q.shift();
+    const kids=children.get(cur.id)||[];
+    for (const c of kids){
+      if (!depth.has(c.id)){
+        depth.set(c.id,(depth.get(cur.id)||0)+1);
+        q.push(c);
       }
     }
   }
 
-  for (const n of folders) {
-    if (!depth.has(n.id)) depth.set(n.id, 0);
+  for (const n of folders){
+    if (!depth.has(n.id)) depth.set(n.id,0);
   }
 
-  // Sort folders: depth asc, suggested asc, id asc
-  folders.sort((a, b) => {
-    const da = depth.get(a.id) ?? 0;
-    const db = depth.get(b.id) ?? 0;
-    if (da !== db) return da - db;
-    const t = (a.suggested || "").localeCompare((b.suggested || ""), "en", { sensitivity: "base" });
-    return t !== 0 ? t : (a.id || "").localeCompare(b.id || "");
+  // Sort output by depth, then suggested, then id
+  folders.sort((a,b)=>{
+    const da=depth.get(a.id), db=depth.get(b.id);
+    if (da!==db) return da-db;
+    const t=a.suggested.localeCompare(b.suggested,"en",{sensitivity:"base"});
+    if (t!==0) return t;
+    return a.id.localeCompare(b.id);
   });
 
-  const out = folders.map(f => ({
-    ID: f.id,
-    [colSuggested]: f.suggested,
-    original_title: f.original
+  const out = folders.map(f=>({
+    ID:f.id,
+    [colSug]:f.suggested,
+    original_title:f.original
   }));
 
-  return Papa.unparse(out, {
-    delimiter: ",",
-    columns: ["ID", colSuggested, "original_title"]
+  return Papa.unparse(out,{
+    delimiter:",",
+    columns:["ID",colSug,"original_title"]
   });
 }
 
-// -------- Build Fixed CSV (optional id_path removal)
-function buildFixedCsv(rows) {
+// Build Fixed CSV
+function buildFixedCsv(rows){
   const removeIdPath = $("optRemoveIdPath").checked;
 
-  // Copy rows
-  const rowsForFixed = rows.map(r => {
-    const o = { ...r };
+  const rowsOut = rows.map(r=>{
+    const o={...r};
     if (removeIdPath) delete o["id_path"];
     return o;
   });
 
-  // Copy fields
-  let fieldsForFixed = [...(state.fields || [])];
-  if (removeIdPath) {
-    fieldsForFixed = fieldsForFixed.filter(f => f !== "id_path");
-    log("Removed column: id_path", "ok");
+  let fieldsOut=[...state.fields];
+  if (removeIdPath){
+    fieldsOut = fieldsOut.filter(f=>f!=="id_path");
+    log("Removed id_path from Fixed CSV","ok");
   }
 
-  return Papa.unparse(rowsForFixed, {
-    delimiter: state.delimiter,
-    columns: fieldsForFixed
+  return Papa.unparse(rowsOut,{
+    delimiter:state.delimiter,
+    columns:fieldsOut
   });
 }
 
-// -------- Reset
+// Reset everything
 function resetAll(){
-  state.fileNameBase = null;
-  state.delimiter = ",";
-  state.data = null;
-  state.fields = null;
-  state.fixedCsv = null;
-  state.longCsv = null;
-  state.statsCsv = null;
-  state.filesCsv = null;
-  state.foldersCsv = null;
-  state.changedCount = 0;
-  state.longCount = 0;
-  state.typeCounts = {};
-  $("log").textContent = "";
+  state.fileNameBase=null;
+  state.delimiter=",";
+  state.data=null;
+  state.fields=null;
+
+  state.fixedCsv=null;
+  state.longCsv=null;
+  state.statsCsv=null;
+  state.filesCsv=null;
+  state.foldersCsv=null;
+
+  state.changedCount=0;
+  state.longCount=0;
+  state.typeCounts={};
+
+  $("log").textContent="";
   disableDownloads();
   enableMainButtons(false);
-  setStatus("Waiting for a file…");
+  setStatus("Waiting for file…");
   renderKPIs();
 }
 
-// -------- Events
-$("file").addEventListener("change", (e) => {
+// EVENTS
+
+// Load CSV
+$("file").addEventListener("change",(e)=>{
   resetAll();
-  const file = e.target.files?.[0];
+  const file=e.target.files?.[0];
   if (!file) return;
 
   state.fileNameBase = inferBaseName(file.name);
-  setStatus(`Loaded: ${file.name}`);
+  setStatus("Loaded: "+file.name);
   enableMainButtons(true);
-  log(`Loaded: ${file.name}`, "ok");
+  log("Loaded: "+file.name,"ok");
 
-  Papa.parse(file, {
-    header: true,
-    skipEmptyLines: true,
-    dynamicTyping: false,
-    worker: true,
-    complete: (res) => {
-      state.data = res.data || [];
+  Papa.parse(file,{
+    header:true,skipEmptyLines:true,dynamicTyping:false,worker:true,
+    complete:(res)=>{
+      state.data = res.data||[];
       state.fields = res.meta?.fields ? [...res.meta.fields] : [];
       state.delimiter = res.meta?.delimiter || ",";
-      log(`Rows: ${state.data.length}`, "ok");
-      log(`Columns: ${state.fields.length}`, "ok");
-      log(`Detected delimiter: "${state.delimiter}"`, "ok");
+
+      log(`Rows: ${state.data.length}`,"ok");
+      log(`Columns: ${state.fields.length}`,"ok");
+      log(`Delimiter: "${state.delimiter}"`,"ok");
+
       computeTypeCounts(state.data);
       renderKPIs();
     },
-    error: (err) => {
-      setStatus("CSV parsing error");
-      log(String(err), "bad");
+    error:(err)=>{
+      setStatus("Parse error");
+      log(String(err),"bad");
     }
   });
 });
 
-$("run").addEventList
+// Process
+$("run").addEventListener("click",()=>{
+  if (!state.data) return;
+
+  disableDownloads();
+  setStatus("Processing…");
+  log("Processing…","ok");
+
+  const rows = state.data.map(r=>({...r}));
+  state.fields=[...(state.fields||[])];
+
+  applyRules(rows);
+  computeTypeCounts(rows);
+
+  state.fixedCsv   = buildFixedCsv(rows);
+  state.longCsv    = buildLongNamesReport(rows);
+  state.statsCsv   = buildStatsReport();
+  state.filesCsv   = buildFilesCsv(rows);
+  state.foldersCsv = buildFoldersCsvSorted(rows);
+
+  log(`Changes applied: ${state.changedCount}`,"ok");
+  log(`Long titles: ${state.longCount}`, state.longCount?"warn":"ok");
+
+  $("dlFixed").disabled=false;
+  $("dlStats").disabled=false;
+  $("dlFiles").disabled=false;
+  $("dlFolders").disabled=false;
+  $("dlLong").disabled=!state.longCsv;
+  $("dlAll").disabled=false;
+
+  setStatus("Done ✓");
+  renderKPIs();
+});
+
+// Reset
+$("reset").addEventListener("click",()=>{
+  $("file").value="";
+  resetAll();
+});
+
+// Downloads
+$("dlFixed").addEventListener("click",()=>{
+  if (state.fixedCsv) downloadText(`${state.fileNameBase}_fixed.csv`,state.fixedCsv);
+});
+$("dlLong").addEventListener("click",()=>{
+  if (state.longCsv) downloadText(`${state.fileNameBase}_long_titles.csv`,state.longCsv);
+});
+$("dlStats").addEventListener("click",()=>{
+  if (state.statsCsv) downloadText(`${state.fileNameBase}_stats.csv`,state.statsCsv);
+});
+$("dlFiles").addEventListener("click",()=>{
+  if (state.filesCsv) downloadText(`Files.csv`,state.filesCsv);
+});
+$("dlFolders").addEventListener("click",()=>{
+  if (state.foldersCsv) downloadText(`Folders.csv`,state.foldersCsv);
+});
+$("dlAll").addEventListener("click",async()=>{
+  const zip=new JSZip();
+  const base=state.fileNameBase||"export";
+
+  zip.file(`${base}_fixed.csv`,state.fixedCsv||"");
+  if (state.longCsv)  zip.file(`${base}_long_titles.csv`,state.longCsv);
+  if (state.statsCsv) zip.file(`${base}_stats.csv`,state.statsCsv);
+  if (state.filesCsv) zip.file(`Files.csv`,state.filesCsv);
+  if (state.foldersCsv) zip.file(`Folders.csv`,state.foldersCsv);
+
+  const blob=await zip.generateAsync({type:"blob"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;
+  a.download=`${base}_exports.zip`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
+
+// Init
+resetAll();
