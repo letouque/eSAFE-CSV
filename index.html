@@ -5,165 +5,54 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>eSAFE CSV – Fix + Reports + Renaming</title>
 
-  <!-- CSV parser -->
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <!-- ZIP -->
-  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/style.css">
 
-  <style>
-    :root{
-      --bg:#0b0712;
-      --text:#f1ecff;
-      --muted:#cbbcff;
-      --border:rgba(255,255,255,.12);
-      --ok:#5dffb2;
-      --warn:#ffd36b;
-      --bad:#ff6b8a;
-      --shadow: 0 18px 60px rgba(0,0,0,.35);
-      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-    }
-    *{box-sizing:border-box}
-    body{
-      margin:0;
-      font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,sans-serif;
-      background:
-        radial-gradient(1200px 600px at 20% 10%, rgba(168,118,255,.18), transparent 60%),
-        radial-gradient(900px 500px at 70% 30%, rgba(255,119,214,.14), transparent 60%),
-        var(--bg);
-      color:var(--text);
-    }
-    .wrap{max-width:1160px;margin:0 auto;padding:28px}
-    h1{margin:0 0 8px;font-size:26px}
-    .sub{margin:0 0 22px;color:var(--muted);line-height:1.45}
-    .grid{display:grid;grid-template-columns:1fr;gap:14px}
-    @media(min-width:980px){.grid{grid-template-columns: 1.15fr .85fr}}
-    .card{
-      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
-      border:1px solid var(--border);
-      border-radius:18px;
-      padding:18px;
-      box-shadow: var(--shadow);
-      overflow:hidden;
-    }
-    .card h2{margin:0 0 10px;font-size:15px;color:var(--muted);font-weight:750}
-    .file{
-      border:1px dashed rgba(255,255,255,.25);
-      padding:14px;border-radius:14px;
-      background: rgba(255,255,255,.03);
-      width:100%;
-    }
-    input[type="file"]{width:100%}
-    .hint{margin-top:8px;color:var(--muted);font-size:12px;line-height:1.4}
-    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-    .opt{
-      display:flex;gap:10px;align-items:flex-start;
-      padding:10px;border-radius:14px;
-      background:rgba(255,255,255,.03);
-      border:1px solid rgba(255,255,255,.08)
-    }
-    .opt small{display:block;color:var(--muted);margin-top:4px;line-height:1.35}
-    .pill{
-      display:inline-flex;align-items:center;gap:8px;
-      padding:8px 10px;border-radius:999px;
-      border:1px solid rgba(255,255,255,.14);
-      background: rgba(255,255,255,.03);
-      color:var(--muted);font-size:12px;
-    }
-    .btn{
-      border:1px solid rgba(255,255,255,.18);
-      background: linear-gradient(90deg, rgba(168,118,255,.25), rgba(255,119,214,.18));
-      color:var(--text);
-      padding:10px 14px;border-radius:14px;
-      cursor:pointer;font-weight:800;
-      transition: transform .05s ease, opacity .15s ease;
-    }
-    .btn.secondary{background: rgba(255,255,255,.04)}
-    .btn:active{transform: translateY(1px)}
-    .btn:disabled{opacity:.5;cursor:not-allowed}
-    .log{
-      margin-top:12px;
-      background: rgba(0,0,0,.35);
-      border:1px solid rgba(255,255,255,.10);
-      border-radius:14px;
-      padding:12px;
-      font-family: var(--mono);
-      font-size:12px;
-      color:rgba(241,236,255,.92);
-      max-height:240px;
-      overflow:auto;
-      white-space:pre-wrap;
-    }
-    .kpi{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:10px}
-    .k{
-      border:1px solid rgba(255,255,255,.10);
-      background: rgba(255,255,255,.03);
-      border-radius:14px;
-      padding:12px;
-    }
-    .k b{display:block;font-size:18px;margin-bottom:2px}
-    .k span{color:var(--muted);font-size:12px}
-    .tablewrap{
-      margin-top:12px;
-      border:1px solid rgba(255,255,255,.10);
-      border-radius:14px;
-      overflow:hidden;
-      background: rgba(255,255,255,.02);
-    }
-    table{width:100%;border-collapse:collapse;font-size:12px}
-    th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left;vertical-align:top}
-    th{color:var(--muted);font-weight:800;background:rgba(255,255,255,.03)}
-    tr:last-child td{border-bottom:none}
-    code{font-family:var(--mono);font-size:12px;color:rgba(241,236,255,.92)}
-    input[type="number"]{
-      padding:8px;border-radius:12px;
-      background:rgba(0,0,0,.25);
-      border:1px solid rgba(255,255,255,.18);
-      color:var(--text)
-    }
-    .footer{opacity:.78;margin-top:14px;font-size:12px;color:var(--muted);line-height:1.4}
-    .ok{color:var(--ok)} .warn{color:var(--warn)} .bad{color:var(--bad)}
-    .split{height:10px}
-  </style>
+  <!-- Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 </head>
 
 <body>
   <div class="wrap">
+
     <h1>eSAFE CSV – Fix + Reports + Renaming</h1>
     <p class="sub">
-      Upload → process → download. Everything runs locally in your browser.
-      <br>
-      <b>Important:</b> corrected titles (max 50 chars, extension preserved) are applied <b>only</b> in
-      <b>Files.csv</b> and <b>Folders.csv</b>.
+      Upload → process → download. Everything runs locally in your browser.<br>
+      <b>Important:</b> corrected titles (max length based on settings) are applied
+      <b>only</b> in <b>Files.csv</b> and <b>Folders.csv</b>.
     </p>
 
     <div class="grid">
-      <!-- LEFT -->
+
+      <!-- LEFT PANEL -->
       <div class="card">
         <h2>1) Upload</h2>
+
         <div class="file">
           <input id="file" type="file" accept=".csv,text/csv" />
           <div class="hint">
-            Delimiter auto-detected (often <code>;</code>). Worker mode enabled to avoid UI freezes on large CSVs.
+            Delimiter auto-detected. Worker mode enabled for large CSVs.
           </div>
         </div>
 
         <div class="split"></div>
 
-        <h2>2) Fixed CSV options</h2>
+        <h2>2) Fixed CSV Options</h2>
 
         <div class="opt">
           <input id="optTypeCtoO" type="checkbox" checked />
           <div>
             <label for="optTypeCtoO"><b>Replace type C → O</b></label>
-            <small>Your system does not support C (Collection).</small>
+            <small>Your system does not support type C (Collection).</small>
           </div>
         </div>
 
         <div class="opt">
           <input id="optStripZ" type="checkbox" checked />
           <div>
-            <label for="optStripZ"><b>Remove trailing “Z” from date/time fields</b></label>
-            <small>Applies to <code>isadg.eventStartDates</code> and <code>isadg.eventEndDates</code> when present.</small>
+            <label for="optStripZ"><b>Remove trailing “Z” in date/time</b></label>
+            <small>For fields <code>isadg.eventStartDates</code> and <code>isadg.eventEndDates</code>.</small>
           </div>
         </div>
 
@@ -182,21 +71,54 @@
 
         <div class="split"></div>
 
-        <h2>3) Reports</h2>
+        <h2>3) Renaming Options (Files & Folders)</h2>
+
+        <div class="opt">
+          <input id="optRename" type="checkbox" checked />
+          <div style="width:100%">
+            <label for="optRename"><b>Enable renaming corrections</b></label>
+            <small>Applies only to Files.csv and Folders.csv</small>
+
+            <div class="row" style="margin-top:10px">
+              <span class="pill">Max length</span>
+              <input id="renameMaxLen" type="number" value="50" min="10" style="width:110px">
+            </div>
+
+            <div class="row">
+              <input id="renameStripEmail" type="checkbox" checked>
+              <label for="renameStripEmail">Remove email prefixes (FW:, RE:, FWD:, etc.)</label>
+            </div>
+
+            <div class="row">
+              <input id="renameSubjectOnly" type="checkbox">
+              <label for="renameSubjectOnly">Keep only email subject</label>
+            </div>
+
+            <div class="row">
+              <input id="renameCleanSpaces" type="checkbox" checked>
+              <label for="renameCleanSpaces">Normalize spaces</label>
+            </div>
+
+            <div class="row">
+              <input id="renameNoSpecial" type="checkbox">
+              <label for="renameNoSpecial">Remove special characters</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="split"></div>
+
+        <h2>4) Reports</h2>
 
         <div class="opt">
           <input id="optLongNames" type="checkbox" checked />
           <div style="width:100%">
-            <label for="optLongNames"><b>Report: titles too long</b> (based on <code>isadg.title</code>)</label>
-            <small>
-              Flags titles over a threshold (e.g., 40). Report also includes <code>suggested_50</code> (max 50, extension preserved).
-            </small>
+            <label for="optLongNames"><b>Report: titles too long</b></label>
+            <small>Detects titles longer than the threshold below.</small>
 
             <div class="row" style="margin-top:10px">
-              <span class="pill">“Too long” threshold</span>
-              <input id="maxLen" type="number" value="40" min="1" style="width:110px" />
-              <span class="pill">Renaming correction</span>
-              <span class="pill"><b>50</b> chars max</span>
+              <span class="pill">Threshold</span>
+              <input id="maxLen" type="number" value="40" min="1" style="width:110px">
             </div>
           </div>
         </div>
@@ -211,19 +133,12 @@
 
         <div id="log" class="log" aria-live="polite"></div>
 
-        <div class="footer">
-          Outputs:
-          <ul style="margin:8px 0 0 18px;padding:0">
-            <li><b>Files.csv</b>: <code>type=F</code>, columns <code>ID,title</code> (title shortened to 50 if needed, extension preserved).</li>
-            <li><b>Folders.csv</b>: <code>type=O</code>, columns <code>ID,title</code>, sorted root → depth (title shortened to 50 if needed).</li>
-            <li><b>Fixed CSV</b>: applies your rules but <b>does not shorten</b> titles.</li>
-          </ul>
-        </div>
       </div>
 
-      <!-- RIGHT -->
+      <!-- RIGHT PANEL -->
       <div class="card">
-        <h2>4) Downloads</h2>
+        <h2>Downloads</h2>
+
         <div class="row" style="justify-content:flex-end">
           <button id="dlFixed" class="btn" disabled>Fixed CSV</button>
           <button id="dlFiles" class="btn secondary" disabled>Files.csv</button>
@@ -237,7 +152,7 @@
           <div class="k"><b id="kRows">—</b><span>Rows</span></div>
           <div class="k"><b id="kCols">—</b><span>Columns</span></div>
           <div class="k"><b id="kChanged">—</b><span>Changes applied</span></div>
-          <div class="k"><b id="kLong">—</b><span>Long titles (report)</span></div>
+          <div class="k"><b id="kLong">—</b><span>Long titles</span></div>
         </div>
 
         <div class="tablewrap">
@@ -251,519 +166,11 @@
           </table>
         </div>
 
-        <div class="footer">
-          Encoding: UTF-8 (Excel-friendly, BOM included).<br>
-          Original delimiter preserved for <b>Fixed CSV</b> and reports. <b>Files.csv</b> & <b>Folders.csv</b> use commas.
-        </div>
       </div>
     </div>
   </div>
 
-<script>
-  const $ = (id) => document.getElementById(id);
-
-  const CORRECT_MAX_LEN = 50; // corrected names only in Files/Folders at 50 max (keep extension)
-
-  const state = {
-    fileNameBase: null,
-    delimiter: ",",
-    data: null,       // parsed rows (objects)
-    fields: null,     // headers
-    // outputs
-    fixedCsv: null,
-    longCsv: null,
-    statsCsv: null,
-    filesCsv: null,
-    foldersCsv: null,
-    // stats
-    changedCount: 0,
-    longCount: 0,
-    typeCounts: {}
-  };
-
-  // -------- UI helpers
-  function log(msg, cls=""){
-    const el = $("log");
-    const line = cls ? `[${cls.toUpperCase()}] ${msg}` : msg;
-    el.textContent += (el.textContent ? "\n" : "") + line;
-    el.scrollTop = el.scrollHeight;
-  }
-  function setStatus(text){ $("status").textContent = text; }
-  function enableMainButtons(ok){
-    $("run").disabled = !ok;
-    $("reset").disabled = !ok;
-  }
-  function disableDownloads(){
-    $("dlFixed").disabled = true;
-    $("dlLong").disabled = true;
-    $("dlStats").disabled = true;
-    $("dlFiles").disabled = true;
-    $("dlFolders").disabled = true;
-    $("dlAll").disabled = true;
-  }
-  function safeGet(row, key){
-    return (row && Object.prototype.hasOwnProperty.call(row, key)) ? row[key] : "";
-  }
-  function inferBaseName(fileName){
-    const i = fileName.toLowerCase().lastIndexOf(".csv");
-    return i > 0 ? fileName.slice(0, i) : fileName;
-  }
-
-  // -------- CSV helpers
-  function stripTrailingZ(value){
-    if (typeof value !== "string") return value;
-    return value.endsWith("Z") ? value.slice(0, -1) : value;
-  }
-
-  // Keep extension, shorten only basename, add ellipsis, maxLen total
-  function suggestShortNameKeepExt(filename, maxLen=50){
-    let original = String(filename ?? "").trim().replace(/\s+/g, " ");
-    if (!original) return original;
-
-    // detect extension (last dot, but ignore leading dot files)
-    const lastDot = original.lastIndexOf(".");
-    let name = original;
-    let ext = "";
-
-    if (lastDot > 0 && lastDot < original.length - 1){
-      name = original.slice(0, lastDot);
-      ext = original.slice(lastDot); // includes "."
-    }
-
-    if (original.length <= maxLen) return original;
-
-    const allowedNameLen = maxLen - ext.length - 1; // -1 for ellipsis
-    if (allowedNameLen <= 0) return original.slice(0, maxLen);
-
-    let cut = name.slice(0, allowedNameLen);
-
-    // cut at a space if possible, but don't cut too early
-    const lastSpace = cut.lastIndexOf(" ");
-    if (lastSpace >= Math.floor(allowedNameLen * 0.6)){
-      cut = cut.slice(0, lastSpace);
-    }
-
-    return cut.trimEnd() + "…" + ext;
-  }
-
-  function correctedTitle50(title){
-    const t = String(title ?? "").trim().replace(/\s+/g, " ");
-    if (!t) return t;
-    return (t.length > CORRECT_MAX_LEN) ? suggestShortNameKeepExt(t, CORRECT_MAX_LEN) : t;
-  }
-
-  function downloadText(filename, text){
-    const bom = "\uFEFF";
-    const blob = new Blob([bom + text], {type: "text/csv;charset=utf-8"});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  }
-
-  // -------- Stats
-  function computeTypeCounts(rows){
-    const counts = {};
-    for (const r of rows){
-      const t = String(safeGet(r,"type") || "");
-      counts[t] = (counts[t] || 0) + 1;
-    }
-    state.typeCounts = counts;
-  }
-  function renderKPIs(){
-    $("kRows").textContent = state.data ? state.data.length : "—";
-    $("kCols").textContent = state.fields ? state.fields.length : "—";
-    $("kChanged").textContent = (state.changedCount ?? "—");
-    $("kLong").textContent = (state.longCount ?? "—");
-
-    const tbody = $("typeCounts");
-    tbody.innerHTML = "";
-    const entries = Object.entries(state.typeCounts || {}).sort((a,b)=>b[1]-a[1]);
-    if (!entries.length){
-      tbody.innerHTML = `<tr><td colspan="2" style="color:var(--muted)">—</td></tr>`;
-      return;
-    }
-    for (const [t,c] of entries){
-      const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${t || "(empty)"}</td><td>${c}</td>`;
-      tbody.appendChild(tr);
-    }
-  }
-
-  function buildStatsReport(){
-    const rows = [];
-    rows.push({metric:"rows", value: state.data.length});
-    rows.push({metric:"columns", value: state.fields.length});
-    rows.push({metric:"changes_applied", value: state.changedCount});
-    rows.push({metric:"long_titles_report_count", value: state.longCount});
-    rows.push({metric:"rename_outputs_title_max_len", value: CORRECT_MAX_LEN});
-    for (const [t,c] of Object.entries(state.typeCounts)){
-      rows.push({metric:`type_${t || "empty"}_count`, value:c});
-    }
-    return Papa.unparse(rows, {delimiter: state.delimiter || ","});
-  }
-
-  // -------- Core rules (for fixed CSV only)
-  function applyRules(rows){
-    state.changedCount = 0;
-
-    const optTypeCtoO = $("optTypeCtoO").checked;
-    const optStripZ = $("optStripZ").checked;
-    const optDupFields = $("optDupFields").checked;
-
-    const ensureField = (name) => {
-      if (!state.fields.includes(name)) state.fields.push(name);
-    };
-
-    if (optDupFields){
-      ensureField("id_display_name");
-      ensureField("dc.title");
-      ensureField("dc.id");
-      ensureField("dc.date");
-    }
-
-    const dateCols = ["isadg.eventStartDates", "isadg.eventEndDates"];
-
-    for (const r of rows){
-      if (optTypeCtoO && safeGet(r,"type") === "C"){
-        r["type"] = "O";
-        state.changedCount++;
-      }
-
-      if (optStripZ){
-        for (const col of dateCols){
-          if (Object.prototype.hasOwnProperty.call(r, col)){
-            const before = r[col];
-            const after = stripTrailingZ(before);
-            if (after !== before){
-              r[col] = after;
-              state.changedCount++;
-            }
-          }
-        }
-      }
-
-      if (optDupFields){
-        const title = safeGet(r,"isadg.title");
-        const ident = safeGet(r,"isadg.identifier");
-        const start = safeGet(r,"isadg.eventStartDates");
-
-        if (r["id_display_name"] !== title){ r["id_display_name"] = title; state.changedCount++; }
-        if (r["dc.title"] !== title){ r["dc.title"] = title; state.changedCount++; }
-        if (r["dc.id"] !== ident){ r["dc.id"] = ident; state.changedCount++; }
-        if (r["dc.date"] !== start){ r["dc.date"] = start; state.changedCount++; }
-      }
-    }
-  }
-
-  function toCsv(rows){
-    return Papa.unparse(rows, {
-      delimiter: state.delimiter || ",",
-      columns: state.fields
-    });
-  }
-
-  // -------- Long titles report (ONLY isadg.title; includes suggested_50 keeping extension)
-  function buildLongNamesReport(rows){
-    if (!$("optLongNames").checked){
-      state.longCount = 0;
-      return null;
-    }
-    const threshold = parseInt($("maxLen").value || "40", 10);
-
-    const report = [];
-    for (const r of rows){
-      const originalTitle = String(safeGet(r,"isadg.title") ?? "").trim().replace(/\s+/g, " ");
-      if (!originalTitle) continue;
-
-      if (originalTitle.length > threshold){
-        const suggestion50 = suggestShortNameKeepExt(originalTitle, CORRECT_MAX_LEN);
-        report.push({
-          id: safeGet(r,"id"),
-          type: safeGet(r,"type"),
-          parent_id: safeGet(r,"parent_id"),
-          isadg_title: originalTitle,
-          title_length: originalTitle.length,
-          suggested_50: suggestion50,
-          suggested_50_length: suggestion50.length,
-          id_path: safeGet(r,"id_path"),
-          isadg_identifier: safeGet(r,"isadg.identifier")
-        });
-      }
-    }
-    report.sort((a,b)=>b.title_length - a.title_length);
-    state.longCount = report.length;
-    return Papa.unparse(report, {delimiter: state.delimiter || ","});
-  }
-
-  // -------- Files.csv / Folders.csv (apply corrected title only HERE)
-  function buildFilesCsv(rows){
-    const out = [];
-    for (const r of rows){
-      if (String(safeGet(r,"type")) === "F"){
-        const id = safeGet(r,"id");
-        const title = correctedTitle50(safeGet(r,"isadg.title"));
-        out.push({ID: id, title: title});
-      }
-    }
-    return Papa.unparse(out, {delimiter: ","});
-  }
-
-  function buildFoldersCsvSorted(rows){
-    const folders = [];
-    const byId = new Map();
-
-    for (const r of rows){
-      if (String(safeGet(r,"type")) === "O"){
-        const id = String(safeGet(r,"id") ?? "");
-        const parent = String(safeGet(r,"parent_id") ?? "");
-        const title = correctedTitle50(safeGet(r,"isadg.title"));
-        const node = { id, parent_id: parent, title };
-        folders.push(node);
-        if (id) byId.set(id, node);
-      }
-    }
-
-    const roots = [];
-    for (const n of folders){
-      const p = (n.parent_id || "").trim();
-      if (!p || !byId.has(p)) roots.push(n);
-    }
-
-    const depth = new Map();
-    const q = [];
-    for (const r of roots){
-      depth.set(r.id, 0);
-      q.push(r);
-    }
-
-    const children = new Map();
-    for (const n of folders){
-      const p = (n.parent_id || "").trim();
-      if (!children.has(p)) children.set(p, []);
-      children.get(p).push(n);
-    }
-
-    // deterministic order among siblings
-    for (const [, arr] of children.entries()){
-      arr.sort((a,b)=>{
-        const ta = (a.title || "").localeCompare(b.title || "", "en", {sensitivity:"base"});
-        if (ta !== 0) return ta;
-        return (a.id || "").localeCompare(b.id || "");
-      });
-    }
-
-    while (q.length){
-      const cur = q.shift();
-      const kids = children.get(cur.id) || [];
-      for (const child of kids){
-        if (!depth.has(child.id)){
-          depth.set(child.id, (depth.get(cur.id) ?? 0) + 1);
-          q.push(child);
-        }
-      }
-    }
-
-    for (const n of folders){
-      if (!depth.has(n.id)) depth.set(n.id, 0);
-    }
-
-    folders.sort((a,b)=>{
-      const da = depth.get(a.id) ?? 0;
-      const db = depth.get(b.id) ?? 0;
-      if (da !== db) return da - db;
-      const t = (a.title || "").localeCompare(b.title || "", "en", {sensitivity:"base"});
-      if (t !== 0) return t;
-      return (a.id || "").localeCompare(b.id || "");
-    });
-
-    const out = folders.map(f => ({ID: f.id, title: f.title}));
-    return Papa.unparse(out, {delimiter: ","});
-  }
-
-  // -------- Reset
-  function resetAll(){
-    state.fileNameBase = null;
-    state.delimiter = ",";
-    state.data = null;
-    state.fields = null;
-    state.fixedCsv = null;
-    state.longCsv = null;
-    state.statsCsv = null;
-    state.filesCsv = null;
-    state.foldersCsv = null;
-    state.changedCount = 0;
-    state.longCount = 0;
-    state.typeCounts = {};
-    $("log").textContent = "";
-    disableDownloads();
-    enableMainButtons(false);
-    setStatus("Waiting for a file…");
-    renderKPIs();
-  }
-
-  // -------- LocalStorage (remember options)
-  const OPT_KEYS = ["optTypeCtoO","optStripZ","optDupFields","optLongNames","maxLen"];
-  function saveOpts(){
-    const o = {};
-    for (const k of OPT_KEYS){
-      const el = $(k);
-      if (!el) continue;
-      o[k] = (el.type === "checkbox") ? el.checked : el.value;
-    }
-    localStorage.setItem("eSAFEcsvOpts", JSON.stringify(o));
-  }
-  function loadOpts(){
-    const raw = localStorage.getItem("eSAFEcsvOpts");
-    if (!raw) return;
-    try{
-      const o = JSON.parse(raw);
-      for (const k of OPT_KEYS){
-        const el = $(k);
-        if (!el) continue;
-        if (el.type === "checkbox") el.checked = !!o[k];
-        else el.value = o[k] ?? el.value;
-      }
-    }catch(e){}
-  }
-
-  // -------- Events
-  $("file").addEventListener("change", (e) => {
-    resetAll();
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    state.fileNameBase = inferBaseName(file.name);
-    setStatus(`Loaded: ${file.name}`);
-    enableMainButtons(true);
-    log(`Loaded: ${file.name}`, "ok");
-
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      dynamicTyping: false,
-      worker: true,
-      complete: (res) => {
-        state.data = res.data || [];
-        state.fields = (res.meta && res.meta.fields) ? [...res.meta.fields] : [];
-        state.delimiter = (res.meta && res.meta.delimiter) ? res.meta.delimiter : ",";
-        log(`Rows: ${state.data.length}`, "ok");
-        log(`Columns: ${state.fields.length}`, "ok");
-        log(`Detected delimiter: "${state.delimiter}"`, "ok");
-        computeTypeCounts(state.data);
-        renderKPIs();
-      },
-      error: (err) => {
-        setStatus("CSV parsing error");
-        log(String(err), "bad");
-      }
-    });
-  });
-
-  $("run").addEventListener("click", async () => {
-    if (!state.data) return;
-
-    disableDownloads();
-    saveOpts();
-
-    log("Processing…", "ok");
-    setStatus("Processing…");
-
-    const rows = state.data.map(r => ({...r}));
-    state.fields = [...(state.fields || [])];
-
-    // fixed CSV rules
-    applyRules(rows);
-
-    // counts after rules (C->O etc.)
-    computeTypeCounts(rows);
-
-    // outputs
-    state.fixedCsv   = toCsv(rows);
-    state.longCsv    = buildLongNamesReport(rows);
-    state.statsCsv   = buildStatsReport();
-
-    // renaming outputs ONLY: apply corrected titles here
-    state.filesCsv   = buildFilesCsv(rows);
-    state.foldersCsv = buildFoldersCsvSorted(rows);
-
-    log(`Changes applied (Fixed CSV): ${state.changedCount}`, "ok");
-    log(`Long titles report: ${state.longCount}`, state.longCount ? "warn" : "ok");
-    log(`Renaming correction: titles max ${CORRECT_MAX_LEN} (Files.csv / Folders.csv only)`, "ok");
-
-    $("dlFixed").disabled = false;
-    $("dlStats").disabled = false;
-    $("dlFiles").disabled = false;
-    $("dlFolders").disabled = false;
-    $("dlLong").disabled = !state.longCsv;
-    $("dlAll").disabled = false;
-
-    setStatus("Done ✅");
-    renderKPIs();
-  });
-
-  $("reset").addEventListener("click", () => {
-    $("file").value = "";
-    resetAll();
-  });
-
-  $("dlFixed").addEventListener("click", () => {
-    if (!state.fixedCsv) return;
-    downloadText(`${state.fileNameBase}_fixed.csv`, state.fixedCsv);
-  });
-  $("dlLong").addEventListener("click", () => {
-    if (!state.longCsv) return;
-    downloadText(`${state.fileNameBase}_long_titles.csv`, state.longCsv);
-  });
-  $("dlStats").addEventListener("click", () => {
-    if (!state.statsCsv) return;
-    downloadText(`${state.fileNameBase}_stats.csv`, state.statsCsv);
-  });
-
-  $("dlFiles").addEventListener("click", () => {
-    if (!state.filesCsv) return;
-    downloadText(`Files.csv`, state.filesCsv);
-  });
-  $("dlFolders").addEventListener("click", () => {
-    if (!state.foldersCsv) return;
-    downloadText(`Folders.csv`, state.foldersCsv);
-  });
-
-  $("dlAll").addEventListener("click", async () => {
-    if (!state.fixedCsv && !state.longCsv && !state.statsCsv && !state.filesCsv && !state.foldersCsv) return;
-
-    const zip = new JSZip();
-    const base = state.fileNameBase || "export";
-
-    zip.file(`${base}_fixed.csv`, state.fixedCsv || "");
-    if (state.longCsv)  zip.file(`${base}_long_titles.csv`, state.longCsv);
-    if (state.statsCsv) zip.file(`${base}_stats.csv`, state.statsCsv);
-    if (state.filesCsv) zip.file(`Files.csv`, state.filesCsv);
-    if (state.foldersCsv) zip.file(`Folders.csv`, state.foldersCsv);
-
-    const blob = await zip.generateAsync({ type: "blob" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${base}_exports.zip`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  });
-
-  // remember options
-  loadOpts();
-  for (const k of OPT_KEYS){
-    const el = $(k);
-    if (el) el.addEventListener("change", saveOpts);
-  }
-
-  resetAll();
-</script>
+  <!-- Main app logic -->
+  <script src="js/app.js"></script>
 </body>
 </html>
