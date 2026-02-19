@@ -67,9 +67,11 @@ function extractEmailSubject(name) {
 function normalizeSpaces(name) { return name.trim().replace(/\s+/g, " "); }
 
 function removeSpecialChars(name) {
+  // IMPORTANT: extension split happens BEFORE this; we only clean the base.
   return name.replace(/[^0-9A-Za-zÀ-ÖØ-öø-ÿ _-]+/g, "");
 }
 
+// Shortening that always preserves ext
 function shortenSmart(base, ext, maxLen) {
   const ell = "…";
   const full = base + ext;
@@ -92,30 +94,30 @@ function smartRename(original, opts) {
   if (!opts.enabled) return original || "";
   if (!original) return "";
 
-  // Always normalize unicode first
+  // 0) normalize unicode
   let name = String(original).normalize("NFC");
 
-  // 1) Strip prefixes BEFORE modifying characters
+  // 1) remove email prefixes first (before we touch separators)
   if (opts.stripEmail) name = cleanEmailPrefixes(name);
 
-  // 2) Optional subject extraction
+  // 2) optionally keep only subject after first ":" (if present)
   if (opts.subjectOnly) name = extractEmailSubject(name);
 
-  // 3) Normalize spaces
-  if (opts.cleanSpaces) name = normalizeSpaces(name);
-
-  // 4) Remove special chars after cleaning prefixes
-  if (opts.noSpecial) name = removeSpecialChars(name);
-
-  // 5) Safe extension handling
+  // 3) *** CRITICAL ORDER FIX ***
+  //    Split extension BEFORE other transformations so we never lose the dot.
+  let base = name;
+  let ext = "";
   const dot = name.lastIndexOf(".");
-  let base = name, ext = "";
   if (dot > 0 && dot < name.length - 1) {
     base = name.slice(0, dot);
-    ext  = name.slice(dot);
+    ext  = name.slice(dot); // includes "."
   }
 
-  // 6) Apply max length
+  // 4) Now clean ONLY the base (never touch ext)
+  if (opts.cleanSpaces) base = normalizeSpaces(base);
+  if (opts.noSpecial)   base = removeSpecialChars(base);
+
+  // 5) Apply max length to the recombined name (base + ext)
   const maxLen = parseInt(opts.maxLen || "50", 10);
   return shortenSmart(base, ext, maxLen);
 }
