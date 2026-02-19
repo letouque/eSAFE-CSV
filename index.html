@@ -6,29 +6,29 @@
   <title>eSAFE CSV – Fix + Reports + Renaming</title>
 
   <!-- Styles -->
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css" />
 
   <!-- Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+  <!-- App -->
+  <script defer src="js/app.js"></script>
 </head>
 
 <body>
   <div class="wrap">
-
     <h1>eSAFE CSV – Fix + Reports + Renaming</h1>
     <p class="sub">
       Upload → process → download. Everything runs locally in your browser.<br>
-      <b>Important:</b> corrected titles (max length based on settings) are applied
+      <b>Important:</b> corrected titles (based on Renaming options) are applied
       <b>only</b> in <b>Files.csv</b> and <b>Folders.csv</b>.
     </p>
 
     <div class="grid">
-
       <!-- LEFT PANEL -->
       <div class="card">
         <h2>1) Upload</h2>
-
         <div class="file">
           <input id="file" type="file" accept=".csv,text/csv" />
           <div class="hint">
@@ -69,10 +69,18 @@
           </div>
         </div>
 
+        <!-- ✅ NEW: Remove id_path option for Fixed CSV -->
+        <div class="opt">
+          <input id="optRemoveIdPath" type="checkbox" />
+          <div>
+            <label for="optRemoveIdPath"><b>Remove id_path column</b></label>
+            <small>id_path is not required in the Fixed CSV export.</small>
+          </div>
+        </div>
+
         <div class="split"></div>
 
         <h2>3) Renaming Options (Files & Folders)</h2>
-
         <div class="opt">
           <input id="optRename" type="checkbox" checked />
           <div style="width:100%">
@@ -86,7 +94,7 @@
 
             <div class="row">
               <input id="renameStripEmail" type="checkbox" checked>
-              <label for="renameStripEmail">Remove email prefixes (FW:, RE:, FWD:, etc.)</label>
+              <label for="renameStripEmail">Remove email prefixes (FW:, FWD:, RE:, Fwd_, Re_, etc.)</label>
             </div>
 
             <div class="row">
@@ -109,7 +117,6 @@
         <div class="split"></div>
 
         <h2>4) Reports</h2>
-
         <div class="opt">
           <input id="optLongNames" type="checkbox" checked />
           <div style="width:100%">
@@ -132,7 +139,6 @@
         </div>
 
         <div id="log" class="log" aria-live="polite"></div>
-
       </div>
 
       <!-- RIGHT PANEL -->
@@ -166,11 +172,12 @@
           </table>
         </div>
 
+        <div class="footer">
+          Encoding: UTF-8 (Excel-friendly, BOM included).<br>
+          Original delimiter preserved for <b>Fixed CSV</b> and reports. <b>Files.csv</b> &amp; <b>Folders.csv</b> use commas.
+        </div>
       </div>
     </div>
   </div>
-
-  <!-- Main app logic -->
-  <script src="js/app.js"></script>
 </body>
 </html>
