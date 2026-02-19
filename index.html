@@ -8,9 +8,12 @@
   <!-- Styles -->
   <link rel="stylesheet" href="css/style.css" />
 
-  <!-- Libraries -->
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <!-- Libraries (load before app.js) -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" defer></script>
+
+  <!-- App -->
+  <script src="js/app.js" defer></script>
 </head>
 
 <body>
@@ -68,9 +71,9 @@
           </div>
         </div>
 
-        <!-- REMOVE id_path -->
+        <!-- Remove id_path -->
         <div class="opt">
-          <input id="optRemoveIdPath" type="checkbox" checked />
+          <input id="optRemoveIdPath" type="checkbox" />
           <div>
             <label for="optRemoveIdPath"><b>Remove id_path column</b></label>
             <small>Removes id_path only from the Fixed CSV.</small>
@@ -89,11 +92,7 @@
 
             <div class="row" style="margin-top:10px">
               <span class="pill">Max length</span>
-              <input id="renameMaxLen"
-                     type="number"
-                     value="50"
-                     min="10"
-                     style="width:110px" />
+              <input id="renameMaxLen" type="number" value="50" min="10" style="width:110px" />
             </div>
 
             <div class="row">
@@ -134,11 +133,7 @@
             <div class="row" style="margin-top:10px">
               <span class="pill">Threshold</span>
               <!-- Default is now 80 -->
-              <input id="maxLen"
-                     type="number"
-                     value="80"
-                     min="1"
-                     style="width:110px" />
+              <input id="maxLen" type="number" value="80" min="1" style="width:110px" />
             </div>
           </div>
         </div>
@@ -159,12 +154,12 @@
         <h2>Downloads</h2>
 
         <div class="row" style="justify-content:flex-end">
-          <button id="dlFixed"   class="btn"          disabled>Fixed CSV</button>
+          <button id="dlFixed"   class="btn"           disabled>Fixed CSV</button>
           <button id="dlFiles"   class="btn secondary" disabled>Files.csv</button>
           <button id="dlFolders" class="btn secondary" disabled>Folders.csv</button>
           <button id="dlLong"    class="btn secondary" disabled>Long titles report</button>
           <button id="dlStats"   class="btn secondary" disabled>Stats</button>
-          <button id="dlAll"     class="btn"          disabled>All (ZIP)</button>
+          <button id="dlAll"     class="btn"           disabled>All (ZIP)</button>
         </div>
 
         <div class="kpi">
@@ -195,8 +190,5 @@
 
     </div>
   </div>
-
-  <!-- App logic -->
-  <script src="js/app.js"></script>
 </body>
 </html>
