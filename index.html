@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>eSAFE CSV – Fix + Reports + Renaming</title>
 
-  <!-- Styles -->
-  <link rel="stylesheet" href="css/style.css" />
+  <!-- CSS -->
+  <link rel="stylesheet" href="css/style.css">
 
-  <!-- Libraries (load before app.js) -->
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" defer></script>
+  <!-- Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 
-  <!-- App -->
+  <!-- Main app -->
   <script src="js/app.js" defer></script>
 </head>
 
@@ -21,8 +21,7 @@
     <h1>eSAFE CSV – Fix + Reports + Renaming</h1>
     <p class="sub">
       Upload → process → download. Everything runs locally in your browser.<br>
-      <b>Important:</b> Suggested (renamed) titles apply only to
-      <b>Files.csv</b> and <b>Folders.csv</b>.
+      <b>Important:</b> Suggested titles apply only to <b>Files.csv</b> and <b>Folders.csv</b>.
     </p>
 
     <div class="grid">
@@ -46,7 +45,7 @@
           <input id="optTypeCtoO" type="checkbox" checked />
           <div>
             <label for="optTypeCtoO"><b>Replace type C → O</b></label>
-            <small>Your system does not allow type C (Collection).</small>
+            <small>eSAFE does not support type C (Collection).</small>
           </div>
         </div>
 
@@ -54,19 +53,18 @@
           <input id="optStripZ" type="checkbox" checked />
           <div>
             <label for="optStripZ"><b>Remove trailing “Z”</b></label>
-            <small>Removes Z from <code>isadg.eventStartDates</code> / <code>isadg.eventEndDates</code>.</small>
+            <small>Only for Start/End date columns.</small>
           </div>
         </div>
 
         <div class="opt">
           <input id="optDupFields" type="checkbox" checked />
           <div>
-            <label for="optDupFields"><b>Duplicate fields</b></label>
+            <label for="optDupFields"><b>Duplicate descriptive fields</b></label>
             <small>
-              <code>isadg.title → id_display_name</code><br>
-              <code>isadg.title → dc.title</code><br>
+              <code>isadg.title → id_display_name, dc.title</code><br>
               <code>isadg.identifier → dc.id</code><br>
-              <code>isadg.eventStartDates → dc.date</code>
+              <code>eventStartDates → dc.date</code>
             </small>
           </div>
         </div>
@@ -75,8 +73,8 @@
         <div class="opt">
           <input id="optRemoveIdPath" type="checkbox" />
           <div>
-            <label for="optRemoveIdPath"><b>Remove id_path column</b></label>
-            <small>Removes id_path only from the Fixed CSV.</small>
+            <label for="optRemoveIdPath"><b>Remove id_path from Fixed CSV</b></label>
+            <small>id_path is not needed for eSAFE import.</small>
           </div>
         </div>
 
@@ -88,7 +86,7 @@
           <input id="optRename" type="checkbox" checked />
           <div style="width:100%">
             <label for="optRename"><b>Enable renaming</b></label>
-            <small>Used only for Files.csv and Folders.csv outputs.</small>
+            <small>Used only in Files.csv and Folders.csv</small>
 
             <div class="row" style="margin-top:10px">
               <span class="pill">Max length</span>
@@ -102,7 +100,7 @@
 
             <div class="row">
               <input id="renameSubjectOnly" type="checkbox">
-              <label for="renameSubjectOnly">Keep only subject (after “:”) when present</label>
+              <label for="renameSubjectOnly">Keep only subject (after “:”)</label>
             </div>
 
             <div class="row">
@@ -125,14 +123,10 @@
           <input id="optLongNames" type="checkbox" checked />
           <div style="width:100%">
             <label for="optLongNames"><b>Report: long titles</b></label>
-            <small>
-              Detects titles longer than the threshold below.<br>
-              Report includes <code>original_title</code> and <code>suggested_title (N)</code>.
-            </small>
+            <small>Report includes <code>original_title</code> and <code>suggested_title (N)</code>.</small>
 
             <div class="row" style="margin-top:10px">
               <span class="pill">Threshold</span>
-              <!-- Default is now 80 -->
               <input id="maxLen" type="number" value="80" min="1" style="width:110px" />
             </div>
           </div>
@@ -143,7 +137,7 @@
         <div class="row">
           <button id="run" class="btn" disabled>Process</button>
           <button id="reset" class="btn secondary" disabled>Reset</button>
-          <span id="status" class="pill">Waiting for a file…</span>
+          <span id="status" class="pill">Waiting for file…</span>
         </div>
 
         <div id="log" class="log" aria-live="polite"></div>
@@ -157,7 +151,7 @@
           <button id="dlFixed"   class="btn"           disabled>Fixed CSV</button>
           <button id="dlFiles"   class="btn secondary" disabled>Files.csv</button>
           <button id="dlFolders" class="btn secondary" disabled>Folders.csv</button>
-          <button id="dlLong"    class="btn secondary" disabled>Long titles report</button>
+          <button id="dlLong"    class="btn secondary" disabled>Long titles</button>
           <button id="dlStats"   class="btn secondary" disabled>Stats</button>
           <button id="dlAll"     class="btn"           disabled>All (ZIP)</button>
         </div>
@@ -181,14 +175,14 @@
         </div>
 
         <div class="footer">
-          Encoding: UTF‑8 with BOM.<br>
-          <b>Files.csv</b> and <b>Folders.csv</b> include:
-          <code>ID</code>, <code>suggested_title (N)</code>, <code>original_title</code>.<br>
-          Original delimiter preserved for Fixed CSV and reports.
+          UTF‑8 + BOM.<br>
+          <b>Files.csv</b> &amp; <b>Folders.csv</b> include:<br>
+          <code>ID</code>, <code>suggested_title (N)</code>, <code>original_title</code>.
         </div>
       </div>
 
     </div>
   </div>
+
 </body>
 </html>
