@@ -1,16 +1,11 @@
 // ====================================================================
-// eSAFE CSV TOOL — VERSION FINALE (2026-02-19)
-// ====================================================================
-// Fonctionnalités incluses :
-//  ✔ Renaming robuste (préfixes emails, espaces, caractères spéciaux)
-//  ✔ Extension toujours issue du id_path pour les fichiers
-//  ✔ Folders.csv = id_path, suggested_title, original_title
-//  ✔ Files.csv   = ID, suggested_title, original_title
-//  ✔ Rapports long titles = original + suggested
-//  ✔ Fix des colonnes : type C→O, strip Z, duplications
-//  ✔ Option suppression id_path du Fixed CSV
-//  ✔ BFS sorting stable pour les dossiers
-// ====================================================================
+// eSAFE CSV TOOL — FINAL (2026-02-19)
+//  • Files.csv: ID, suggested_title (N), original_title
+//  • Folders.csv: id_path, suggested_title (N), original_title
+//  • Extensions des fichiers toujours depuis id_path (fallback .txt)
+//  • Dossiers: jamais d'extension dans suggested_title
+//  • En-têtes e-mail réels retirés (si <email> en tête), préfixes RE/FW/FWD…
+/* ================================================================== */
 
 const $ = (id) => document.getElementById(id);
 
@@ -29,10 +24,7 @@ const state = {
   typeCounts: {}
 };
 
-
-// ============================================================
-//  HELPERS
-// ============================================================
+/* ===================== UI HELPERS ===================== */
 
 function log(msg, cls="") {
   const el = $("log");
@@ -55,16 +47,15 @@ function inferBaseName(fn){
   const i=fn.toLowerCase().lastIndexOf(".csv");
   return i>0 ? fn.slice(0,i) : fn;
 }
+
+/* ===================== CSV HELPERS ===================== */
+
 function stripTrailingZ(x){
   return (typeof x==="string" && x.endsWith("Z")) ? x.slice(0,-1) : x;
 }
 
+/* ========== EXTENSION RULES (FINAL: from id_path only) ========== */
 
-// ============================================================
-//  EXTENSION RULES (DEFINITIVES)
-// ============================================================
-
-// Sépare base + extension s’il y a un vrai "."
 function splitBaseExt(name){
   const dot = name.lastIndexOf(".");
   if (dot > 0 && dot < name.length - 1){
@@ -73,60 +64,71 @@ function splitBaseExt(name){
   return { base: name, ext: "" };
 }
 
-// Extrait EXT de id_path (c’est la référence ABSOLUE)
 function extractExtFromIdPath(row){
   const idp = safeGet(row,"id_path");
   if (!idp) return "";
   const last = idp.split("/").pop() || "";
-  return splitBaseExt(last).ext;  // ".txt" / ".xls" / "" …
+  return splitBaseExt(last).ext;  // ".txt", ".xls", … or ""
 }
 
-// Règle finale : FILES => ext = id_path ; fallback .txt
 function determineFinalExt(row){
   const ext = extractExtFromIdPath(row);
   if (ext) return ext;
-  return ".txt";
+  return ".txt";   // fallback
 }
 
+/* ========== EMAIL ORIGIN STRIP (only true headers with <email>) ========== */
+/* Ne retire que les en-têtes e-mail réels en TÊTE de titre :
+   From "Name" <email> …  |  "Name" <email> …  |  Name <email> …  |  <email> …
+   Laisse intact les phrases normales: ex. "M. Okello (from Abidjan) …"
+*/
 
-// ============================================================
-//  PREFIX / CLEANUP
-// ============================================================
+function stripEmailHeaders(text) {
+  if (!text) return "";
+  let x = String(text).trim();
+
+  // 1) "From ... <email>"
+  if (/^from\s+.*?<[^>]+>/i.test(x)) {
+    x = x.replace(/^from\s+.*?>\s*/i, "");
+    return x.replace(/\s+/g, " ").trim();
+  }
+
+  // 2) Leading "Name" <email>
+  x = x.replace(/^"[^"]+"\s*<[^>]+>\s*/i, "");
+
+  // 3) Leading Name <email>
+  x = x.replace(/^[A-Za-z0-9 .,'"-]{1,60}<[^>]+>\s*/i, "");
+
+  // 4) Leading <email>
+  x = x.replace(/^<[^>]+>\s*/i, "");
+
+  return x.replace(/\s+/g," ").trim();
+}
+
+/* ========== EMAIL PREFIXES (RE:, FW:, FWD:, Fwd_, Re_ …) ========== */
 
 function cleanEmailPrefixes(name){
   if (!name) return "";
-
-  let x = name.replace(/^[\s"'`«»\[\]\(\)\{\}>-]+/, "");
-
-  // Ordre important : fwd|fw évite le bug “d_”
-  const re = /^(?:\s*(fwd|fw|re|from|to)\s*[:_\-–]*\s*)/i;
-
+  let x = name.replace(/^[\s"'`«»\[\]\(\)\{\}>-]+/, ""); // bruit initial
+  const re = /^(?:\s*(fwd|fw|re|from|to)\s*[:_\-–]*\s*)/i; // ordre fwd|fw évite "d_"
   while (re.test(x)) x = x.replace(re, "");
-
-  x = x.replace(/^[\s:_\-–]+/, "");
+  x = x.replace(/^[\s:_\-–]+/, ""); // séparateurs restants
   return x.trimStart();
 }
 
 function extractEmailSubject(n){
-  const p=n.split(":");
-  return p.length>1 ? p.slice(1).join(":").trim() : n;
+  const p = n.split(":");
+  return p.length > 1 ? p.slice(1).join(":").trim() : n;
 }
 
 function normalizeSpaces(n){ return n.trim().replace(/\s+/g," "); }
+function removeSpecialChars(n){ return n.replace(/[^0-9A-Za-zÀ-ÖØ-öø-ÿ _-]+/g,""); }
 
-function removeSpecialChars(n){
-  return n.replace(/[^0-9A-Za-zÀ-ÖØ-öø-ÿ _-]+/g,"");
-}
-
-
-// ============================================================
-//  SHORTENING
-// ============================================================
+/* ===================== SHORTEN ===================== */
 
 function shortenSmart(base, ext, maxLen){
-  const ell = "…";
-  const full = base + ext;
-
+  const ell="…";
+  const full=base+ext;
   if (full.length <= maxLen) return full;
 
   const maxBase = maxLen - ext.length - ell.length;
@@ -134,36 +136,35 @@ function shortenSmart(base, ext, maxLen){
 
   let short = base.slice(0,maxBase);
   const ls = short.lastIndexOf(" ");
-
-  if (ls > maxBase * 0.6) short = short.slice(0,ls);
+  if (ls > maxBase*0.6) short = short.slice(0,ls);
 
   short = short.replace(/[\s._-]+$/,"");
   return short + ell + ext;
 }
 
-
-// ============================================================
-//  RENAMING (version finale)
-// ============================================================
+/* ===================== RENAMING ENGINE ===================== */
 
 function smartRename(original, opts, row){
   if (!opts.enabled) return original || "";
-  if (!original)     return "";
+  if (!original)      return "";
 
-  let raw = String(original).normalize("NFC");
+  // 1) En-tête e-mail réel (si <email> présent en tête)
+  let raw = stripEmailHeaders(String(original).normalize("NFC"));
 
+  // 2) Préfixes FW/RE…, puis "subject only" si demandé
   if (opts.stripEmail)  raw = cleanEmailPrefixes(raw);
   if (opts.subjectOnly) raw = extractEmailSubject(raw);
 
+  // 3) On renomme la base (on ignore toute extension du titre)
   let { base } = splitBaseExt(raw);
-
   if (opts.cleanSpaces) base = normalizeSpaces(base);
   if (opts.noSpecial)    base = removeSpecialChars(base);
 
-  // EXT ÉLABORÉE VIA id_path UNIQUEMENT
+  // 4) Extension toujours depuis id_path
   const ext = determineFinalExt(row);
 
-  const maxLen = parseInt(opts.maxLen || "50",10);
+  // 5) Raccourcir base+ext
+  const maxLen = parseInt(opts.maxLen||"50",10);
   return shortenSmart(base, ext, maxLen);
 }
 
@@ -180,14 +181,11 @@ function correctedTitle(original, row){
 }
 
 function suggestedHeader(){
-  const n = parseInt($("renameMaxLen").value || "50",10);
+  const n = parseInt($("renameMaxLen").value||"50",10);
   return `suggested_title (${n})`;
 }
 
-
-// ============================================================
-//  DOWNLOAD
-// ============================================================
+/* ===================== DOWNLOAD ===================== */
 
 function downloadText(fn,txt){
   const bom="\uFEFF";
@@ -200,38 +198,33 @@ function downloadText(fn,txt){
   URL.revokeObjectURL(url);
 }
 
-
-// ============================================================
-//  STATS
-// ============================================================
+/* ===================== STATS ===================== */
 
 function computeTypeCounts(rows){
   const c={};
   for(const r of rows){
-    const t = safeGet(r,"type") || "";
-    c[t] = (c[t] || 0) + 1;
+    const t=String(safeGet(r,"type")||"");
+    c[t]=(c[t]||0)+1;
   }
-  state.typeCounts = c;
+  state.typeCounts=c;
 }
 
 function renderKPIs(){
-  $("kRows").textContent = state.data ? state.data.length : "—";
-  $("kCols").textContent = state.fields ? state.fields.length : "—";
-  $("kChanged").textContent = state.changedCount ?? "—";
-  $("kLong").textContent = state.longCount ?? "—";
+  $("kRows").textContent=state.data ? state.data.length:"—";
+  $("kCols").textContent=state.fields ? state.fields.length:"—";
+  $("kChanged").textContent=state.changedCount ?? "—";
+  $("kLong").textContent=state.longCount ?? "—";
 
-  const tb = $("typeCounts");
-  tb.innerHTML = "";
-  const ent = Object.entries(state.typeCounts).sort((a,b)=>b[1]-a[1]);
-
+  const tb=$("typeCounts");
+  tb.innerHTML="";
+  const ent=Object.entries(state.typeCounts).sort((a,b)=>b[1]-a[1]);
   if (!ent.length){
-    tb.innerHTML = `<tr><td colspan="2" style="color:var(--muted)">—</td></tr>`;
+    tb.innerHTML=`<tr><td colspan="2" style="color:var(--muted)">—</td></tr>`;
     return;
   }
-
   for(const [t,c] of ent){
     const tr=document.createElement("tr");
-    tr.innerHTML = `<td>${t||"(empty)"}<\/td><td>${c}<\/td>`;
+    tr.innerHTML=`<td>${t||"(empty)"}<\/td><td>${c}<\/td>`;
     tb.appendChild(tr);
   }
 }
@@ -249,10 +242,7 @@ function buildStatsReport(){
   return Papa.unparse(rows,{delimiter:state.delimiter});
 }
 
-
-// ============================================================
-//  APPLY FIXED CSV RULES
-// ============================================================
+/* ===================== FIXED CSV RULES ===================== */
 
 function applyRules(rows){
   state.changedCount=0;
@@ -299,31 +289,24 @@ function applyRules(rows){
   }
 }
 
-
-// ============================================================
-//  LONG TITLES REPORT
-// ============================================================
+/* ===================== LONG TITLES REPORT ===================== */
 
 function buildLongNamesReport(rows){
   if (!$("optLongNames").checked){
     state.longCount=0;
     return null;
   }
-
   const threshold=parseInt($("maxLen").value||"80",10);
   const colSug=suggestedHeader();
 
   const out=[];
   for(const r of rows){
-
     const original=String(safeGet(r,"isadg.title")??"")
       .trim().replace(/\s+/g," ");
-
     if(!original) continue;
 
     if(original.length > threshold){
       const suggested=correctedTitle(original,r);
-
       out.push({
         id: safeGet(r,"id"),
         type: safeGet(r,"type"),
@@ -350,14 +333,10 @@ function buildLongNamesReport(rows){
     colSug,"suggested_length",
     "id_path","isadg_identifier"
   ];
-
   return Papa.unparse(out,{delimiter:state.delimiter,columns:cols});
 }
 
-
-// ============================================================
-//  FILES.CSV (ID + suggested + original)
-// ============================================================
+/* ===================== FILES.CSV ===================== */
 
 function buildFilesCsv(rows){
   const colSug=suggestedHeader();
@@ -365,8 +344,7 @@ function buildFilesCsv(rows){
   for(const r of rows){
     if(String(safeGet(r,"type"))==="F"){
       const orig = safeGet(r,"isadg.title") || "";
-      const sug  = correctedTitle(orig, r);  // ext from id_path
-
+      const sug  = correctedTitle(orig, r);     // extension depuis id_path
       out.push({
         ID: safeGet(r,"id"),
         [colSug]: sug,
@@ -374,17 +352,13 @@ function buildFilesCsv(rows){
       });
     }
   }
-
   return Papa.unparse(out,{
     delimiter:",",
     columns:["ID",colSug,"original_title"]
   });
 }
 
-
-// ============================================================
-//  FOLDERS.CSV (id_path + suggested + original)
-// ============================================================
+/* ===================== FOLDERS.CSV ===================== */
 
 function buildFoldersCsvSorted(rows){
   const colSug=suggestedHeader();
@@ -394,24 +368,22 @@ function buildFoldersCsvSorted(rows){
   // Collect nodes
   for (const r of rows){
     if(String(safeGet(r,"type"))==="O"){
-
       const id      = String(safeGet(r,"id")||"");
       const parent  = String(safeGet(r,"parent_id")||"");
       const id_path = String(safeGet(r,"id_path")||"");
       const orig    = String(safeGet(r,"isadg.title")||"");
 
-      // Suggest without extension for folders
+      // suggested SANS extension pour dossiers
       const sugFull = correctedTitle(orig,r);
       const sug     = splitBaseExt(sugFull).base;
 
       const node = { id, id_path, parent_id: parent, suggested: sug, original: orig };
       folders.push(node);
-
       if (id) byId.set(id,node);
     }
   }
 
-  // Find roots
+  // Roots
   const roots=[];
   for(const n of folders){
     const p=(n.parent_id||"").trim();
@@ -439,7 +411,7 @@ function buildFoldersCsvSorted(rows){
     });
   }
 
-  // BFS traversal
+  // BFS traverse
   while(q.length){
     const cur=q.shift();
     const kids=children.get(cur.id)||[];
@@ -454,14 +426,12 @@ function buildFoldersCsvSorted(rows){
     if(!depth.has(n.id)) depth.set(n.id,0);
   }
 
-  // Final sort: depth → name → id_path
+  // Final sort: depth → suggested → id_path
   folders.sort((a,b)=>{
     const da=depth.get(a.id), db=depth.get(b.id);
     if(da!==db) return da-db;
-
     const t=a.suggested.localeCompare(b.suggested,"en",{sensitivity:"base"});
     if(t!==0) return t;
-
     return a.id_path.localeCompare(b.id_path);
   });
 
@@ -477,10 +447,7 @@ function buildFoldersCsvSorted(rows){
   });
 }
 
-
-// ============================================================
-//  FIXED CSV (avec option suppression id_path)
-// ============================================================
+/* ===================== FIXED CSV (id_path removable) ===================== */
 
 function buildFixedCsv(rows){
   const remove = $("optRemoveIdPath").checked;
@@ -503,10 +470,7 @@ function buildFixedCsv(rows){
   });
 }
 
-
-// ============================================================
-//  RESET
-// ============================================================
+/* ===================== RESET ===================== */
 
 function resetAll(){
   state.fileNameBase=null;
@@ -521,7 +485,6 @@ function resetAll(){
   state.changedCount=0;
   state.longCount=0;
   state.typeCounts={};
-
   $("log").textContent="";
   disableDownloads();
   enableMainButtons(false);
@@ -529,10 +492,7 @@ function resetAll(){
   renderKPIs();
 }
 
-
-// ============================================================
-//  EVENTS
-// ============================================================
+/* ===================== EVENTS ===================== */
 
 $("file").addEventListener("change",(e)=>{
   resetAll();
@@ -564,7 +524,6 @@ $("file").addEventListener("change",(e)=>{
     }
   });
 });
-
 
 $("run").addEventListener("click",()=>{
   if(!state.data) return;
@@ -598,14 +557,12 @@ $("run").addEventListener("click",()=>{
   renderKPIs();
 });
 
-
 $("reset").addEventListener("click",()=>{
   $("file").value="";
   resetAll();
 });
 
-
-// ---- DOWNLOADS ----
+/* ===================== DOWNLOAD BUTTONS ===================== */
 
 $("dlFixed").addEventListener("click",()=>{
   if(state.fixedCsv) downloadText(`${state.fileNameBase}_fixed.csv`,state.fixedCsv);
@@ -632,9 +589,9 @@ $("dlAll").addEventListener("click",async()=>{
   if(state.filesCsv) zip.file(`Files.csv`,state.filesCsv);
   if(state.foldersCsv) zip.file(`Folders.csv`,state.foldersCsv);
 
-  const blob = await zip.generateAsync({type:"blob"});
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement("a");
+  const blob=await zip.generateAsync({type:"blob"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
   a.href=url; a.download=`${base}_exports.zip`;
   document.body.appendChild(a);
   a.click();
@@ -642,5 +599,5 @@ $("dlAll").addEventListener("click",async()=>{
   URL.revokeObjectURL(url);
 });
 
-// INIT
+/* ===================== INIT ===================== */
 resetAll();
