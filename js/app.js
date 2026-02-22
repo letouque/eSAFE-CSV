@@ -1,11 +1,12 @@
 // ====================================================================
-// eSAFE CSV TOOL — FINAL (2026-02-19)
-//  • Files.csv: ID, suggested_title (N), original_title
-//  • Folders.csv: id_path, suggested_title (N), original_title
-//  • Extensions des fichiers toujours depuis id_path (fallback .txt)
-//  • Dossiers: jamais d'extension dans suggested_title
-//  • En-têtes e-mail réels retirés (si <email> en tête), préfixes RE/FW/FWD…
-/* ================================================================== */
+// eSAFE CSV TOOL — IMPROVED (2026-02-22)
+//  • Meilleur nettoyage préfixes email (imbriqués, cas complexes)
+//  • Raccourcissement intelligent amélioré
+//  • Blacklist de mots à supprimer
+//  • Règles regex personnalisées
+//  • Prévisualisation du renommage (live)
+//  • Aperçu CSV dans la page
+// ====================================================================
 
 const $ = (id) => document.getElementById(id);
 
@@ -54,7 +55,7 @@ function stripTrailingZ(x){
   return (typeof x==="string" && x.endsWith("Z")) ? x.slice(0,-1) : x;
 }
 
-/* ========== EXTENSION RULES (FINAL: from id_path only) ========== */
+/* ========== EXTENSION RULES ========== */
 
 function splitBaseExt(name){
   const dot = name.lastIndexOf(".");
@@ -68,51 +69,63 @@ function extractExtFromIdPath(row){
   const idp = safeGet(row,"id_path");
   if (!idp) return "";
   const last = idp.split("/").pop() || "";
-  return splitBaseExt(last).ext;  // ".txt", ".xls", … or ""
+  return splitBaseExt(last).ext;
 }
 
 function determineFinalExt(row){
   const ext = extractExtFromIdPath(row);
   if (ext) return ext;
-  return ".txt";   // fallback
+  return ".txt";
 }
 
-/* ========== EMAIL ORIGIN STRIP (only true headers with <email>) ========== */
-/* Ne retire que les en-têtes e-mail réels en TÊTE de titre :
-   From "Name" <email> …  |  "Name" <email> …  |  Name <email> …  |  <email> …
-   Laisse intact les phrases normales: ex. "M. Okello (from Abidjan) …"
-*/
+/* ========== EMAIL ORIGIN STRIP ========== */
 
 function stripEmailHeaders(text) {
   if (!text) return "";
   let x = String(text).trim();
 
-  // 1) "From ... <email>"
+  // From ... <email>
   if (/^from\s+.*?<[^>]+>/i.test(x)) {
     x = x.replace(/^from\s+.*?>\s*/i, "");
     return x.replace(/\s+/g, " ").trim();
   }
 
-  // 2) Leading "Name" <email>
+  // "Name" <email>
   x = x.replace(/^"[^"]+"\s*<[^>]+>\s*/i, "");
-
-  // 3) Leading Name <email>
+  // Name <email>
   x = x.replace(/^[A-Za-z0-9 .,'"-]{1,60}<[^>]+>\s*/i, "");
-
-  // 4) Leading <email>
+  // <email>
   x = x.replace(/^<[^>]+>\s*/i, "");
 
   return x.replace(/\s+/g," ").trim();
 }
 
-/* ========== EMAIL PREFIXES (RE:, FW:, FWD:, Fwd_, Re_ …) ========== */
+/* ========== EMAIL PREFIXES — IMPROVED ========== */
+// Gère les imbrications profondes : Re: Fwd: Re: FW: Re: sujet
+// et les variantes avec tirets, underscores, espaces
 
 function cleanEmailPrefixes(name){
   if (!name) return "";
-  let x = name.replace(/^[\s"'`«»\[\]\(\)\{\}>-]+/, ""); // bruit initial
-  const re = /^(?:\s*(fwd|fw|re|from|to)\s*[:_\-–]*\s*)/i; // ordre fwd|fw évite "d_"
-  while (re.test(x)) x = x.replace(re, "");
-  x = x.replace(/^[\s:_\-–]+/, ""); // séparateurs restants
+
+  // Retirer le bruit initial
+  let x = name.replace(/^[\s"'`«»\[\]\(\)\{\}>-]+/, "");
+
+  // Regex améliorée : couvre toutes les variantes connues
+  // fwd, fw, re, tr (français), ré (accents), rép, rep, from, to
+  const prefixRe = /^\s*(?:fwd|fw|fwde|re|ré|rép|rep|tr|from|to)\s*(?:[:_\-–\s]\s*)+/i;
+
+  // Boucle pour nettoyer les préfixes imbriqués (Re: Fwd: Re: ...)
+  let prev;
+  let safety = 0;
+  do {
+    prev = x;
+    x = x.replace(prefixRe, "");
+    safety++;
+  } while (x !== prev && safety < 20);
+
+  // Supprimer les séparateurs résiduels en début
+  x = x.replace(/^[\s:_\-–|]+/, "");
+
   return x.trimStart();
 }
 
@@ -122,23 +135,92 @@ function extractEmailSubject(n){
 }
 
 function normalizeSpaces(n){ return n.trim().replace(/\s+/g," "); }
-function removeSpecialChars(n){ return n.replace(/[^0-9A-Za-zÀ-ÖØ-öø-ÿ _-]+/g,""); }
+function removeSpecialChars(n){ return n.replace(/[^0-9A-Za-zÀ-ÖØ-öø-ÿ _\-().]+/g,""); }
 
-/* ===================== SHORTEN ===================== */
+/* ========== BLACKLIST ========== */
+
+function getBlacklist(){
+  const raw = $("renameBlacklist")?.value || "";
+  return raw
+    .split("\n")
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+function applyBlacklist(text, blacklist){
+  if (!blacklist.length) return text;
+  let x = text;
+  for (const word of blacklist){
+    // Escape special chars for regex safety
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    x = x.replace(new RegExp(escaped, "gi"), "");
+  }
+  return x.replace(/\s+/g, " ").trim();
+}
+
+/* ========== CUSTOM REGEX RULES ========== */
+
+function getCustomRules(){
+  const raw = $("renameCustomRules")?.value || "";
+  const rules = [];
+  for (const line of raw.split("\n")){
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    // Format attendu : pattern → replacement  (ou pattern -> replacement)
+    const sep = trimmed.indexOf("→") !== -1 ? "→" : "->";
+    const parts = trimmed.split(sep);
+    if (parts.length >= 2){
+      const pattern = parts[0].trim();
+      const replacement = parts.slice(1).join(sep).trim();
+      try {
+        rules.push({ re: new RegExp(pattern, "gi"), replacement });
+      } catch(e){
+        // Regex invalide : ignorer silencieusement
+      }
+    }
+  }
+  return rules;
+}
+
+function applyCustomRules(text, rules){
+  let x = text;
+  for (const rule of rules){
+    x = x.replace(rule.re, rule.replacement);
+    rule.re.lastIndex = 0; // reset global flag
+  }
+  return x.trim();
+}
+
+/* ===================== SHORTEN — IMPROVED ===================== */
 
 function shortenSmart(base, ext, maxLen){
-  const ell="…";
-  const full=base+ext;
+  const ell = "…";
+  const full = base + ext;
   if (full.length <= maxLen) return full;
 
   const maxBase = maxLen - ext.length - ell.length;
-  if (maxBase <= 0) return full.slice(0,maxLen);
+  if (maxBase <= 2) return (base.slice(0, maxLen - ell.length) + ell).slice(0, maxLen);
 
-  let short = base.slice(0,maxBase);
-  const ls = short.lastIndexOf(" ");
-  if (ls > maxBase*0.6) short = short.slice(0,ls);
+  // Chercher la meilleure coupure : séparateur naturel (espace, tiret, parenthèse)
+  const candidate = base.slice(0, maxBase);
+  const separators = [" ", "-", "_", "(", ",", ";"];
+  let bestCut = -1;
 
-  short = short.replace(/[\s._-]+$/,"");
+  for (const sep of separators){
+    // Chercher le dernier séparateur dans les 80% finaux du candidat
+    const minPos = Math.floor(maxBase * 0.5);
+    let pos = candidate.lastIndexOf(sep);
+    if (pos > minPos && pos > bestCut) bestCut = pos;
+  }
+
+  let short = bestCut > 0 ? candidate.slice(0, bestCut) : candidate;
+  short = short.replace(/[\s._\-,;]+$/, ""); // nettoyer la fin
+
+  // Sécurité : si le résultat est trop court, utiliser la coupure brute
+  if (short.length < maxBase * 0.4){
+    short = candidate.replace(/[\s._\-,;]+$/, "");
+  }
+
   return short + ell + ext;
 }
 
@@ -148,41 +230,159 @@ function smartRename(original, opts, row){
   if (!opts.enabled) return original || "";
   if (!original)      return "";
 
-  // 1) En-tête e-mail réel (si <email> présent en tête)
+  // 1) En-tête e-mail réel
   let raw = stripEmailHeaders(String(original).normalize("NFC"));
 
-  // 2) Préfixes FW/RE…, puis "subject only" si demandé
+  // 2) Préfixes RE/FW/FWD (amélioré)
   if (opts.stripEmail)  raw = cleanEmailPrefixes(raw);
   if (opts.subjectOnly) raw = extractEmailSubject(raw);
 
-  // 3) On renomme la base (on ignore toute extension du titre)
+  // 3) Blacklist
+  if (opts.blacklist?.length) raw = applyBlacklist(raw, opts.blacklist);
+
+  // 4) Règles regex personnalisées
+  if (opts.customRules?.length) raw = applyCustomRules(raw, opts.customRules);
+
+  // 5) Renommer la base (ignore toute extension du titre original)
   let { base } = splitBaseExt(raw);
   if (opts.cleanSpaces) base = normalizeSpaces(base);
-  if (opts.noSpecial)    base = removeSpecialChars(base);
+  if (opts.noSpecial)   base = removeSpecialChars(base);
 
-  // 4) Extension toujours depuis id_path
+  // 6) Extension toujours depuis id_path
   const ext = determineFinalExt(row);
 
-  // 5) Raccourcir base+ext
-  const maxLen = parseInt(opts.maxLen||"50",10);
+  // 7) Raccourcir base+ext (amélioré)
+  const maxLen = parseInt(opts.maxLen || "50", 10);
   return shortenSmart(base, ext, maxLen);
 }
 
-function correctedTitle(original, row){
-  const opts = {
+function getRenameOpts(){
+  return {
     enabled:      $("optRename").checked,
     maxLen:       $("renameMaxLen").value,
     stripEmail:   $("renameStripEmail").checked,
     subjectOnly:  $("renameSubjectOnly").checked,
     cleanSpaces:  $("renameCleanSpaces").checked,
-    noSpecial:    $("renameNoSpecial").checked
+    noSpecial:    $("renameNoSpecial").checked,
+    blacklist:    getBlacklist(),
+    customRules:  getCustomRules()
   };
-  return smartRename(original, opts, row);
+}
+
+function correctedTitle(original, row){
+  return smartRename(original, getRenameOpts(), row);
 }
 
 function suggestedHeader(){
   const n = parseInt($("renameMaxLen").value||"50",10);
   return `suggested_title (${n})`;
+}
+
+/* ===================== PREVIEW PANEL ===================== */
+
+let _previewDebounce = null;
+
+function updateRenamePreview(){
+  clearTimeout(_previewDebounce);
+  _previewDebounce = setTimeout(_doUpdateRenamePreview, 300);
+}
+
+function _doUpdateRenamePreview(){
+  const panel = $("previewPanel");
+  const tbody = $("previewBody");
+  if (!panel || !tbody) return;
+
+  if (!state.data || !state.data.length){
+    panel.style.display = "none";
+    return;
+  }
+
+  const opts = getRenameOpts();
+  if (!opts.enabled){
+    panel.style.display = "none";
+    return;
+  }
+
+  // Prendre un échantillon : 15 premières lignes avec isadg.title non vide
+  const samples = state.data
+    .filter(r => String(safeGet(r,"isadg.title")||"").trim())
+    .slice(0, 15);
+
+  if (!samples.length){
+    panel.style.display = "none";
+    return;
+  }
+
+  tbody.innerHTML = "";
+  for (const r of samples){
+    const orig = String(safeGet(r,"isadg.title")||"").trim();
+    const sug  = smartRename(orig, opts, r);
+    const type = safeGet(r,"type") || "?";
+    const changed = orig !== sug;
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><span class="type-badge type-${type.toLowerCase()}">${type}</span></td>
+      <td class="preview-orig" title="${escHtml(orig)}">${escHtml(truncDisplay(orig, 60))}</td>
+      <td class="preview-arrow">${changed ? "→" : "="}</td>
+      <td class="preview-sug ${changed ? "changed" : "same"}" title="${escHtml(sug)}">${escHtml(truncDisplay(sug, 60))}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  panel.style.display = "block";
+}
+
+function escHtml(s){
+  return String(s)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;");
+}
+
+function truncDisplay(s, n){
+  return s.length > n ? s.slice(0, n) + "…" : s;
+}
+
+/* ===================== CSV APERÇU ===================== */
+
+function showCsvPreview(csv, title, containerId){
+  const container = $(containerId);
+  if (!container || !csv) return;
+
+  const parsed = Papa.parse(csv, { header: true, skipEmptyLines: true });
+  const rows   = parsed.data || [];
+  const fields = parsed.meta?.fields || [];
+
+  if (!rows.length){ container.innerHTML = "<em>Aucune donnée</em>"; return; }
+
+  const preview = rows.slice(0, 10);
+
+  let html = `<div class="csv-preview-header">
+    <span class="csv-preview-title">${escHtml(title)}</span>
+    <span class="pill">${rows.length} lignes · ${fields.length} col.</span>
+  </div>
+  <div class="tablewrap csv-scroll">
+    <table>
+      <thead><tr>${fields.map(f=>`<th>${escHtml(f)}</th>`).join("")}</tr></thead>
+      <tbody>`;
+
+  for (const row of preview){
+    html += "<tr>";
+    for (const f of fields){
+      const val = String(row[f] ?? "");
+      html += `<td title="${escHtml(val)}">${escHtml(truncDisplay(val, 40))}</td>`;
+    }
+    html += "</tr>";
+  }
+
+  html += `</tbody></table></div>`;
+  if (rows.length > 10){
+    html += `<div class="csv-preview-more">+ ${rows.length - 10} lignes non affichées</div>`;
+  }
+
+  container.innerHTML = html;
 }
 
 /* ===================== DOWNLOAD ===================== */
@@ -344,7 +544,7 @@ function buildFilesCsv(rows){
   for(const r of rows){
     if(String(safeGet(r,"type"))==="F"){
       const orig = safeGet(r,"isadg.title") || "";
-      const sug  = correctedTitle(orig, r);     // extension depuis id_path
+      const sug  = correctedTitle(orig, r);
       out.push({
         ID: safeGet(r,"id"),
         [colSug]: sug,
@@ -365,7 +565,6 @@ function buildFoldersCsvSorted(rows){
   const folders=[];
   const byId=new Map();
 
-  // Collect nodes
   for (const r of rows){
     if(String(safeGet(r,"type"))==="O"){
       const id      = String(safeGet(r,"id")||"");
@@ -373,7 +572,6 @@ function buildFoldersCsvSorted(rows){
       const id_path = String(safeGet(r,"id_path")||"");
       const orig    = String(safeGet(r,"isadg.title")||"");
 
-      // suggested SANS extension pour dossiers
       const sugFull = correctedTitle(orig,r);
       const sug     = splitBaseExt(sugFull).base;
 
@@ -383,14 +581,12 @@ function buildFoldersCsvSorted(rows){
     }
   }
 
-  // Roots
   const roots=[];
   for(const n of folders){
     const p=(n.parent_id||"").trim();
     if(!p || !byId.has(p)) roots.push(n);
   }
 
-  // BFS depth
   const depth=new Map();
   const q=[];
   for(const r of roots){ depth.set(r.id,0); q.push(r); }
@@ -402,7 +598,6 @@ function buildFoldersCsvSorted(rows){
     children.get(p).push(n);
   }
 
-  // Sort siblings
   for(const [,arr] of children){
     arr.sort((a,b)=>{
       const t=a.suggested.localeCompare(b.suggested,"en",{sensitivity:"base"});
@@ -411,7 +606,6 @@ function buildFoldersCsvSorted(rows){
     });
   }
 
-  // BFS traverse
   while(q.length){
     const cur=q.shift();
     const kids=children.get(cur.id)||[];
@@ -426,7 +620,6 @@ function buildFoldersCsvSorted(rows){
     if(!depth.has(n.id)) depth.set(n.id,0);
   }
 
-  // Final sort: depth → suggested → id_path
   folders.sort((a,b)=>{
     const da=depth.get(a.id), db=depth.get(b.id);
     if(da!==db) return da-db;
@@ -447,7 +640,7 @@ function buildFoldersCsvSorted(rows){
   });
 }
 
-/* ===================== FIXED CSV (id_path removable) ===================== */
+/* ===================== FIXED CSV ===================== */
 
 function buildFixedCsv(rows){
   const remove = $("optRemoveIdPath").checked;
@@ -490,6 +683,35 @@ function resetAll(){
   enableMainButtons(false);
   setStatus("Waiting for file…");
   renderKPIs();
+
+  // Cacher les panneaux preview
+  const pp = $("previewPanel");
+  if (pp) pp.style.display = "none";
+  const cp = $("csvPreviewContainer");
+  if (cp) cp.innerHTML = "";
+
+  // Reset tabs
+  const tabs = document.querySelectorAll(".tab-btn");
+  tabs.forEach(t => t.classList.remove("active"));
+  const first = tabs[0];
+  if (first) first.classList.add("active");
+  document.querySelectorAll(".csv-preview-pane").forEach(p => p.style.display = "none");
+  const fp = $("pane-fixed");
+  if (fp) fp.style.display = "block";
+}
+
+/* ===================== TABS CSV PREVIEW ===================== */
+
+function initTabs(){
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".csv-preview-pane").forEach(p => p.style.display = "none");
+      btn.classList.add("active");
+      const target = $(btn.dataset.target);
+      if (target) target.style.display = "block";
+    });
+  });
 }
 
 /* ===================== EVENTS ===================== */
@@ -517,6 +739,7 @@ $("file").addEventListener("change",(e)=>{
 
       computeTypeCounts(state.data);
       renderKPIs();
+      updateRenamePreview();
     },
     error:(err)=>{
       setStatus("Parse error");
@@ -524,6 +747,36 @@ $("file").addEventListener("change",(e)=>{
     }
   });
 });
+
+// Drag & drop
+const dropZone = $("dropZone");
+if (dropZone){
+  dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("dragover"); });
+  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
+  dropZone.addEventListener("drop", e => {
+    e.preventDefault();
+    dropZone.classList.remove("dragover");
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.name.toLowerCase().endsWith(".csv")){
+      // Simuler la sélection
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      $("file").files = dt.files;
+      $("file").dispatchEvent(new Event("change"));
+    }
+  });
+}
+
+// Live preview quand les options de renommage changent
+const renameInputs = [
+  "optRename","renameMaxLen","renameStripEmail","renameSubjectOnly",
+  "renameCleanSpaces","renameNoSpecial","renameBlacklist","renameCustomRules"
+];
+for (const id of renameInputs){
+  const el = $(id);
+  if (!el) continue;
+  el.addEventListener(el.tagName === "TEXTAREA" || el.type === "number" ? "input" : "change", updateRenamePreview);
+}
 
 $("run").addEventListener("click",()=>{
   if(!state.data) return;
@@ -555,6 +808,19 @@ $("run").addEventListener("click",()=>{
 
   setStatus("Done ✓");
   renderKPIs();
+
+  // Afficher les aperçus CSV
+  showCsvPreview(state.fixedCsv,   "Fixed CSV",    "pane-fixed");
+  showCsvPreview(state.filesCsv,   "Files.csv",    "pane-files");
+  showCsvPreview(state.foldersCsv, "Folders.csv",  "pane-folders");
+  if(state.longCsv)
+    showCsvPreview(state.longCsv,  "Long Titles",  "pane-long");
+
+  // Activer le premier onglet
+  const firstTab = document.querySelector(".tab-btn");
+  if (firstTab) firstTab.click();
+  const csvSection = $("csvPreviewSection");
+  if (csvSection) csvSection.style.display = "block";
 });
 
 $("reset").addEventListener("click",()=>{
@@ -600,4 +866,5 @@ $("dlAll").addEventListener("click",async()=>{
 });
 
 /* ===================== INIT ===================== */
+initTabs();
 resetAll();
