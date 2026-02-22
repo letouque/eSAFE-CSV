@@ -78,194 +78,121 @@ function determineFinalExt(row){
   return ".txt";
 }
 
-/* ========== EMAIL ORIGIN STRIP ========== */
+/* =================================================================
+   RENAMING PIPELINE
+   Ordre d'exécution sur chaque titre :
+     1. Retirer l'expéditeur en tête   (From Firstname Lastname …)
+     2. Retirer les préfixes email      (Re_ / RE: / Fwd_ / FW: / TR: / Rép: …)
+     3. Normaliser les séparateurs      (-- → -   |  _ seul → espace)
+     4. Normaliser les espaces          (espaces multiples → un seul)
+     5. Couper à la longueur max        (coupure sur mot entier + …)
+     6. Ajouter l'extension             (toujours depuis id_path)
+   ================================================================= */
 
-function stripEmailHeaders(text) {
+/* ── Étape 1 : expéditeur "From Firstname Lastname" en début de titre ── */
+function stripSenderPrefix(text){
   if (!text) return "";
-  let x = String(text).trim();
-
-  // From ... <email>
-  if (/^from\s+.*?<[^>]+>/i.test(x)) {
-    x = x.replace(/^from\s+.*?>\s*/i, "");
-    return x.replace(/\s+/g, " ").trim();
-  }
-
-  // "Name" <email>
-  x = x.replace(/^"[^"]+"\s*<[^>]+>\s*/i, "");
-  // Name <email>
-  x = x.replace(/^[A-Za-z0-9 .,'"-]{1,60}<[^>]+>\s*/i, "");
-  // <email>
-  x = x.replace(/^<[^>]+>\s*/i, "");
-
-  return x.replace(/\s+/g," ").trim();
+  // "From Firstname Lastname Re_…"  ou  "From Firstname Lastname:"
+  // On retire tout jusqu'au premier préfixe email connu ou jusqu'au premier mot clé
+  return text.replace(
+    /^from\s+[A-Za-zÀ-ÖØ-öø-ÿ ''-]{2,60?}\s+(?=re[_: ]|fwd?[_: ]|tr[_: ]|r[ée]p?[_: ]|\S)/i,
+    ""
+  ).trim();
 }
 
-/* ========== EMAIL PREFIXES — IMPROVED ========== */
-// Gère les imbrications profondes : Re: Fwd: Re: FW: Re: sujet
-// et les variantes avec tirets, underscores, espaces
+/* ── Étape 2 : préfixes email imbriqués ── */
+// Couvre : Re_ RE: Re: Fwd_ FW: FWD: TR: Rép: Rep: Ré: R:
+// Boucle jusqu'à ce qu'il n'y en ait plus (cas imbriqués : Re: Fwd: Re: …)
+const EMAIL_PREFIX_RE = /^\s*(?:fwd?|re|r[ée]p?|tr)\s*[_:\-–\s]\s*/i;
 
-function cleanEmailPrefixes(name){
-  if (!name) return "";
-
-  // Retirer le bruit initial
-  let x = name.replace(/^[\s"'`«»\[\]\(\)\{\}>-]+/, "");
-
-  // Regex améliorée : couvre toutes les variantes connues
-  // fwd, fw, re, tr (français), ré (accents), rép, rep, from, to
-  const prefixRe = /^\s*(?:fwd|fw|fwde|re|ré|rép|rep|tr|from|to)\s*(?:[:_\-–\s]\s*)+/i;
-
-  // Boucle pour nettoyer les préfixes imbriqués (Re: Fwd: Re: ...)
-  let prev;
-  let safety = 0;
+function stripEmailPrefixes(text){
+  if (!text) return "";
+  let x = text;
+  let prev, safety = 0;
   do {
     prev = x;
-    x = x.replace(prefixRe, "");
+    x = x.replace(EMAIL_PREFIX_RE, "");
     safety++;
-  } while (x !== prev && safety < 20);
-
-  // Supprimer les séparateurs résiduels en début
-  x = x.replace(/^[\s:_\-–|]+/, "");
-
-  return x.trimStart();
-}
-
-function extractEmailSubject(n){
-  const p = n.split(":");
-  return p.length > 1 ? p.slice(1).join(":").trim() : n;
-}
-
-function normalizeSpaces(n){ return n.trim().replace(/\s+/g," "); }
-function removeSpecialChars(n){ return n.replace(/[^0-9A-Za-zÀ-ÖØ-öø-ÿ _\-().]+/g,""); }
-
-/* ========== BLACKLIST ========== */
-
-function getBlacklist(){
-  const raw = $("renameBlacklist")?.value || "";
-  return raw
-    .split("\n")
-    .map(s => s.trim())
-    .filter(Boolean);
-}
-
-function applyBlacklist(text, blacklist){
-  if (!blacklist.length) return text;
-  let x = text;
-  for (const word of blacklist){
-    // Escape special chars for regex safety
-    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    x = x.replace(new RegExp(escaped, "gi"), "");
-  }
-  return x.replace(/\s+/g, " ").trim();
-}
-
-/* ========== CUSTOM REGEX RULES ========== */
-
-function getCustomRules(){
-  const raw = $("renameCustomRules")?.value || "";
-  const rules = [];
-  for (const line of raw.split("\n")){
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    // Format attendu : pattern → replacement  (ou pattern -> replacement)
-    const sep = trimmed.indexOf("→") !== -1 ? "→" : "->";
-    const parts = trimmed.split(sep);
-    if (parts.length >= 2){
-      const pattern = parts[0].trim();
-      const replacement = parts.slice(1).join(sep).trim();
-      try {
-        rules.push({ re: new RegExp(pattern, "gi"), replacement });
-      } catch(e){
-        // Regex invalide : ignorer silencieusement
-      }
-    }
-  }
-  return rules;
-}
-
-function applyCustomRules(text, rules){
-  let x = text;
-  for (const rule of rules){
-    x = x.replace(rule.re, rule.replacement);
-    rule.re.lastIndex = 0; // reset global flag
-  }
+  } while (x !== prev && safety < 30);
   return x.trim();
 }
 
-/* ===================== SHORTEN — IMPROVED ===================== */
+/* ── Étape 3 : normaliser les séparateurs ── */
+function normalizeSeparators(text){
+  return text
+    .replace(/--+/g, "-")          // double tiret → simple tiret
+    .replace(/(?<!\w)_(?!\w)/g, " ") // underscore isolé → espace (ex: Re_  mais pas file_name)
+    .replace(/\s*-\s*/g, " - ")    // espaces autour des tirets simples
+    .trim();
+}
 
+/* ── Étape 4 : normaliser les espaces ── */
+function normalizeSpaces(text){
+  return text.replace(/\s+/g, " ").trim();
+}
+
+/* ── Étape 5 : couper à la longueur max sur un mot entier ── */
 function shortenSmart(base, ext, maxLen){
   const ell = "…";
   const full = base + ext;
   if (full.length <= maxLen) return full;
 
   const maxBase = maxLen - ext.length - ell.length;
-  if (maxBase <= 2) return (base.slice(0, maxLen - ell.length) + ell).slice(0, maxLen);
+  if (maxBase <= 2) return base.slice(0, maxLen - ell.length) + ell;
 
-  // Chercher la meilleure coupure : séparateur naturel (espace, tiret, parenthèse)
   const candidate = base.slice(0, maxBase);
-  const separators = [" ", "-", "_", "(", ",", ";"];
-  let bestCut = -1;
 
+  // Chercher la meilleure coupure sur séparateur naturel
+  const separators = [" ", "-", ",", ";", "("];
+  let bestCut = -1;
+  const minPos = Math.floor(maxBase * 0.45);
   for (const sep of separators){
-    // Chercher le dernier séparateur dans les 80% finaux du candidat
-    const minPos = Math.floor(maxBase * 0.5);
-    let pos = candidate.lastIndexOf(sep);
+    const pos = candidate.lastIndexOf(sep);
     if (pos > minPos && pos > bestCut) bestCut = pos;
   }
 
   let short = bestCut > 0 ? candidate.slice(0, bestCut) : candidate;
-  short = short.replace(/[\s._\-,;]+$/, ""); // nettoyer la fin
+  short = short.replace(/[\s\-_,;]+$/, "");
 
-  // Sécurité : si le résultat est trop court, utiliser la coupure brute
-  if (short.length < maxBase * 0.4){
-    short = candidate.replace(/[\s._\-,;]+$/, "");
-  }
+  // Filet de sécurité : si trop court, couper brutalement
+  if (short.length < maxBase * 0.35) short = candidate.trimEnd();
 
   return short + ell + ext;
 }
 
-/* ===================== RENAMING ENGINE ===================== */
-
+/* ── Moteur principal ── */
 function smartRename(original, opts, row){
   if (!opts.enabled) return original || "";
-  if (!original)      return "";
+  if (!original)     return "";
 
-  // 1) En-tête e-mail réel
-  let raw = stripEmailHeaders(String(original).normalize("NFC"));
+  let x = String(original).normalize("NFC").trim();
 
-  // 2) Préfixes RE/FW/FWD (amélioré)
-  if (opts.stripEmail)  raw = cleanEmailPrefixes(raw);
-  if (opts.subjectOnly) raw = extractEmailSubject(raw);
+  // 1) Expéditeur en tête
+  if (opts.stripSender)   x = stripSenderPrefix(x);
 
-  // 3) Blacklist
-  if (opts.blacklist?.length) raw = applyBlacklist(raw, opts.blacklist);
+  // 2) Préfixes email
+  if (opts.stripPrefixes) x = stripEmailPrefixes(x);
 
-  // 4) Règles regex personnalisées
-  if (opts.customRules?.length) raw = applyCustomRules(raw, opts.customRules);
+  // 3) Séparateurs
+  if (opts.normSeparators) x = normalizeSeparators(x);
 
-  // 5) Renommer la base (ignore toute extension du titre original)
-  let { base } = splitBaseExt(raw);
-  if (opts.cleanSpaces) base = normalizeSpaces(base);
-  if (opts.noSpecial)   base = removeSpecialChars(base);
+  // 4) Espaces
+  x = normalizeSpaces(x);
 
-  // 6) Extension toujours depuis id_path
-  const ext = determineFinalExt(row);
-
-  // 7) Raccourcir base+ext (amélioré)
-  const maxLen = parseInt(opts.maxLen || "50", 10);
+  // 5+6) Extension (depuis id_path) + longueur max
+  const { base } = splitBaseExt(x);
+  const ext      = determineFinalExt(row);
+  const maxLen   = parseInt(opts.maxLen || "50", 10);
   return shortenSmart(base, ext, maxLen);
 }
 
 function getRenameOpts(){
   return {
-    enabled:      $("optRename").checked,
-    maxLen:       $("renameMaxLen").value,
-    stripEmail:   $("renameStripEmail").checked,
-    subjectOnly:  $("renameSubjectOnly").checked,
-    cleanSpaces:  $("renameCleanSpaces").checked,
-    noSpecial:    $("renameNoSpecial").checked,
-    blacklist:    getBlacklist(),
-    customRules:  getCustomRules()
+    enabled:        $("optRename").checked,
+    maxLen:         $("renameMaxLen").value,
+    stripSender:    $("optStripSender").checked,
+    stripPrefixes:  $("optStripPrefixes").checked,
+    normSeparators: $("optNormSeparators").checked,
   };
 }
 
@@ -769,8 +696,7 @@ if (dropZone){
 
 // Live preview quand les options de renommage changent
 const renameInputs = [
-  "optRename","renameMaxLen","renameStripEmail","renameSubjectOnly",
-  "renameCleanSpaces","renameNoSpecial","renameBlacklist","renameCustomRules"
+  "optRename","renameMaxLen","optStripSender","optStripPrefixes","optNormSeparators"
 ];
 for (const id of renameInputs){
   const el = $(id);
