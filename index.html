@@ -69,7 +69,7 @@
         </div>
 
         <div class="opt">
-          <input id="optRemoveIdPath" type="checkbox" />
+          <input id="optRemoveIdPath" type="checkbox" checked />
           <div>
             <label for="optRemoveIdPath"><b>Remove id_path (Fixed CSV)</b></label>
           </div>
@@ -83,53 +83,99 @@
           <input id="optRename" type="checkbox" checked />
           <div style="width:100%">
             <label for="optRename"><b>Enable renaming</b></label>
+            <small>Applique le pipeline de nettoyage ci-dessous aux titres de Files.csv et Folders.csv.</small>
 
-            <div class="row" style="margin-top:10px">
-              <span class="pill">Max length</span>
-              <input id="renameMaxLen" type="number" value="50" min="10" style="width:110px" />
-            </div>
+            <div class="rename-pipeline">
 
-            <div class="row">
-              <input id="renameStripEmail" type="checkbox" checked>
-              <label for="renameStripEmail">Strip email prefixes (FW:, FWD:, RE:, Fwd_, Re_, TR:, Rép:…)</label>
-            </div>
+              <!-- Étape 1 -->
+              <div class="pipeline-step">
+                <div class="step-header">
+                  <span class="step-num">1</span>
+                  <div>
+                    <label class="step-label">
+                      <input id="optStripSender" type="checkbox" checked />
+                      Retirer l'expéditeur en tête
+                    </label>
+                    <small>Supprime <code>From Firstname Lastname</code> au début du titre.</small>
+                    <div class="example">
+                      <span class="ex-before">From Maeve Murphy Re_ ADGM Liberia…</span>
+                      <span class="ex-arrow">→</span>
+                      <span class="ex-after">Re_ ADGM Liberia…</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-            <div class="row">
-              <input id="renameSubjectOnly" type="checkbox">
-              <label for="renameSubjectOnly">Keep only subject</label>
-            </div>
+              <!-- Étape 2 -->
+              <div class="pipeline-step">
+                <div class="step-header">
+                  <span class="step-num">2</span>
+                  <div>
+                    <label class="step-label">
+                      <input id="optStripPrefixes" type="checkbox" checked />
+                      Retirer les préfixes email
+                    </label>
+                    <small>Supprime <code>Re_</code> <code>RE:</code> <code>Re:</code> <code>Fwd_</code> <code>FW:</code> <code>FWD:</code> <code>TR:</code> <code>Rép:</code> imbriqués.</small>
+                    <div class="example">
+                      <span class="ex-before">Re_ ADGM Liberia -- Request…</span>
+                      <span class="ex-arrow">→</span>
+                      <span class="ex-after">ADGM Liberia -- Request…</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-            <div class="row">
-              <input id="renameCleanSpaces" type="checkbox" checked>
-              <label for="renameCleanSpaces">Normalize spaces</label>
-            </div>
+              <!-- Étape 3 -->
+              <div class="pipeline-step">
+                <div class="step-header">
+                  <span class="step-num">3</span>
+                  <div>
+                    <label class="step-label">
+                      <input id="optNormSeparators" type="checkbox" checked />
+                      Normaliser les séparateurs
+                    </label>
+                    <small>
+                      <code>--</code> → <code>-</code> &nbsp;·&nbsp;
+                      underscore isolé → espace &nbsp;·&nbsp;
+                      espaces autour des tirets uniformisés
+                    </small>
+                    <div class="example">
+                      <span class="ex-before">ADGM Liberia -- Request for participants list</span>
+                      <span class="ex-arrow">→</span>
+                      <span class="ex-after">ADGM Liberia - Request for participants list</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-            <div class="row">
-              <input id="renameNoSpecial" type="checkbox">
-              <label for="renameNoSpecial">Remove special characters</label>
-            </div>
+              <!-- Étape 4 (auto) -->
+              <div class="pipeline-step auto">
+                <div class="step-header">
+                  <span class="step-num auto">4</span>
+                  <div>
+                    <span class="step-label">Normaliser les espaces <span class="badge-auto">automatique</span></span>
+                    <small>Espaces multiples → un seul espace. Toujours actif.</small>
+                  </div>
+                </div>
+              </div>
 
-            <!-- BLACKLIST -->
-            <div class="sub-section">
-              <label class="sub-label" for="renameBlacklist">🗑 Blacklist (one word/phrase per line)</label>
-              <textarea
-                id="renameBlacklist"
-                rows="4"
-                placeholder="confidentiel&#10;DRAFT&#10;[projet]&#10;(version finale)"
-              ></textarea>
-              <small>Each entry is removed from the title (case-insensitive).</small>
-            </div>
+              <!-- Étape 5 -->
+              <div class="pipeline-step">
+                <div class="step-header">
+                  <span class="step-num">5</span>
+                  <div>
+                    <label class="step-label">Longueur maximale</label>
+                    <small>Coupe sur le dernier mot entier et ajoute <code>…</code>. L'extension (depuis <code>id_path</code>) est incluse dans le compte.</small>
+                    <div class="row" style="margin-top:8px">
+                      <span class="pill">Max length</span>
+                      <input id="renameMaxLen" type="number" value="50" min="10" style="width:90px" />
+                      <span style="font-size:12px;color:var(--muted)">caractères (extension incluse)</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-            <!-- CUSTOM REGEX RULES -->
-            <div class="sub-section">
-              <label class="sub-label" for="renameCustomRules">⚙ Custom rules (pattern → replacement)</label>
-              <textarea
-                id="renameCustomRules"
-                rows="4"
-                placeholder="\d{4}-\d{2}-\d{2} → (date removed)&#10;\bv\d+\b → &#10;[A-Z]{2,}-\d+ → (ref)"
-              ></textarea>
-              <small>One rule per line: <code>regex → replacement</code>. Leave replacement empty to delete.</small>
-            </div>
+            </div><!-- /rename-pipeline -->
           </div>
         </div>
 
