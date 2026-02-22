@@ -5,14 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>eSAFE CSV – Fix + Reports + Renaming</title>
 
-  <!-- Styles -->
   <link rel="stylesheet" href="css/style.css" />
 
-  <!-- Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-
-  <!-- App -->
   <script src="js/app.js" defer></script>
 </head>
 
@@ -30,9 +26,11 @@
       <div class="card">
         <h2>1) Upload</h2>
 
-        <div class="file">
+        <!-- Drop zone -->
+        <div class="file" id="dropZone">
           <input id="file" type="file" accept=".csv,text/csv" />
           <div class="hint">
+            Drag &amp; drop a CSV here, or click to browse.<br>
             Delimiter auto‑detected. Worker mode enabled for large CSVs.
           </div>
         </div>
@@ -52,7 +50,7 @@
         <div class="opt">
           <input id="optStripZ" type="checkbox" checked />
           <div>
-            <label for="optStripZ"><b>Remove trailing “Z”</b></label>
+            <label for="optStripZ"><b>Remove trailing "Z"</b></label>
             <small>Removes Z from <code>eventStartDates</code> / <code>eventEndDates</code>.</small>
           </div>
         </div>
@@ -79,7 +77,7 @@
 
         <div class="split"></div>
 
-        <h2>3) Renaming Options (Files & Folders)</h2>
+        <h2>3) Renaming Options (Files &amp; Folders)</h2>
 
         <div class="opt">
           <input id="optRename" type="checkbox" checked />
@@ -93,7 +91,7 @@
 
             <div class="row">
               <input id="renameStripEmail" type="checkbox" checked>
-              <label for="renameStripEmail">Strip email prefixes (FW:, FWD:, RE:, Fwd_, Re_, etc.)</label>
+              <label for="renameStripEmail">Strip email prefixes (FW:, FWD:, RE:, Fwd_, Re_, TR:, Rép:…)</label>
             </div>
 
             <div class="row">
@@ -110,6 +108,48 @@
               <input id="renameNoSpecial" type="checkbox">
               <label for="renameNoSpecial">Remove special characters</label>
             </div>
+
+            <!-- BLACKLIST -->
+            <div class="sub-section">
+              <label class="sub-label" for="renameBlacklist">🗑 Blacklist (one word/phrase per line)</label>
+              <textarea
+                id="renameBlacklist"
+                rows="4"
+                placeholder="confidentiel&#10;DRAFT&#10;[projet]&#10;(version finale)"
+              ></textarea>
+              <small>Each entry is removed from the title (case-insensitive).</small>
+            </div>
+
+            <!-- CUSTOM REGEX RULES -->
+            <div class="sub-section">
+              <label class="sub-label" for="renameCustomRules">⚙ Custom rules (pattern → replacement)</label>
+              <textarea
+                id="renameCustomRules"
+                rows="4"
+                placeholder="\d{4}-\d{2}-\d{2} → (date removed)&#10;\bv\d+\b → &#10;[A-Z]{2,}-\d+ → (ref)"
+              ></textarea>
+              <small>One rule per line: <code>regex → replacement</code>. Leave replacement empty to delete.</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- RENAME PREVIEW -->
+        <div id="previewPanel" style="display:none" class="preview-panel">
+          <div class="preview-header">
+            <span>👁 Rename preview <span class="pill">live · first 15 rows</span></span>
+          </div>
+          <div class="tablewrap csv-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:40px">Type</th>
+                  <th>Original title</th>
+                  <th style="width:24px"></th>
+                  <th>Suggested title</th>
+                </tr>
+              </thead>
+              <tbody id="previewBody"></tbody>
+            </table>
           </div>
         </div>
 
@@ -121,9 +161,7 @@
           <input id="optLongNames" type="checkbox" checked />
           <div style="width:100%">
             <label><b>Report: long titles</b></label>
-            <small>
-              Titles longer than the threshold. Includes original & suggested title.
-            </small>
+            <small>Titles longer than the threshold. Includes original &amp; suggested title.</small>
 
             <div class="row" style="margin-top:10px">
               <span class="pill">Threshold</span>
@@ -172,6 +210,20 @@
               <tr><td colspan="2" style="color:var(--muted)">—</td></tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- CSV PREVIEW SECTION -->
+        <div id="csvPreviewSection" style="display:none; margin-top:18px">
+          <div class="tabs">
+            <button class="tab-btn active" data-target="pane-fixed">Fixed CSV</button>
+            <button class="tab-btn" data-target="pane-files">Files.csv</button>
+            <button class="tab-btn" data-target="pane-folders">Folders.csv</button>
+            <button class="tab-btn" data-target="pane-long">Long Titles</button>
+          </div>
+          <div id="pane-fixed"   class="csv-preview-pane" style="display:block"></div>
+          <div id="pane-files"   class="csv-preview-pane" style="display:none"></div>
+          <div id="pane-folders" class="csv-preview-pane" style="display:none"></div>
+          <div id="pane-long"    class="csv-preview-pane" style="display:none"></div>
         </div>
 
         <div class="footer">
