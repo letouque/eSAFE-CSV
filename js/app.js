@@ -60,7 +60,12 @@ function stripTrailingZ(x){
 function splitBaseExt(name){
   const dot = name.lastIndexOf(".");
   if (dot > 0 && dot < name.length - 1){
-    return { base: name.slice(0,dot), ext: name.slice(dot) };
+    const candidate = name.slice(dot + 1);
+    // Extension valide : 2 à 5 lettres uniquement (ex: .txt .docx .pdf)
+    // Pas de chiffres, espaces, ou texte libre (ex: .Mazou, .2005)
+    if (/^[A-Za-z]{2,5}$/.test(candidate)){
+      return { base: name.slice(0, dot), ext: name.slice(dot) };
+    }
   }
   return { base: name, ext: "" };
 }
@@ -206,7 +211,7 @@ function smartRename(original, opts, row){
   // 5+6) Extension (depuis id_path) + longueur max
   const { base } = splitBaseExt(x);
   const ext      = determineFinalExt(row);
-  const maxLen   = parseInt(opts.maxLen || "50", 10);
+  const maxLen   = parseInt(opts.maxLen || "80", 10);
   return shortenSmart(base, ext, maxLen);
 }
 
@@ -225,7 +230,7 @@ function correctedTitle(original, row){
 }
 
 function suggestedHeader(){
-  const n = parseInt($("renameMaxLen").value||"50",10);
+  const n = parseInt($("renameMaxLen").value||"80",10);
   return `suggested_title (${n})`;
 }
 
