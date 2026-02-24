@@ -207,6 +207,11 @@ function smartRename(original, opts, row){
   if (!opts.enabled) return original || "";
   if (!original)     return "";
 
+  const maxLen = parseInt(opts.maxLen || "80", 10);
+
+  // Si "only long" activé : ne traiter que les titres qui dépassent maxLen
+  if (opts.onlyLong && String(original).trim().length <= maxLen) return String(original).trim();
+
   let x = String(original).normalize("NFC").trim();
 
   // 1) Expéditeur en tête
@@ -224,7 +229,6 @@ function smartRename(original, opts, row){
   // 5+6) Extension (depuis id_path) + longueur max
   const { base } = splitBaseExt(x);
   const ext      = determineFinalExt(row);
-  const maxLen   = parseInt(opts.maxLen || "80", 10);
   return shortenSmart(base, ext, maxLen);
 }
 
@@ -232,6 +236,7 @@ function getRenameOpts(){
   return {
     enabled:        $("optRename").checked,
     maxLen:         $("renameMaxLen").value,
+    onlyLong:       $("optOnlyLong").checked,
     stripSender:    $("optStripSender").checked,
     stripPrefixes:  $("optStripPrefixes").checked,
     normSeparators: $("optNormSeparators").checked,
@@ -738,7 +743,7 @@ if (dropZone){
 
 // Live preview quand les options de renommage changent
 const renameInputs = [
-  "optRename","renameMaxLen","optStripSender","optStripPrefixes","optNormSeparators"
+  "optRename","renameMaxLen","optOnlyLong","optStripSender","optStripPrefixes","optNormSeparators"
 ];
 for (const id of renameInputs){
   const el = $(id);
