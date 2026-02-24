@@ -368,3 +368,125 @@ textarea:focus{outline:1px solid rgba(168,118,255,.6)}
   color:var(--muted);
   line-height:1.6;
 }
+
+/* ===== MODAL ===== */
+.modal-overlay{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.65);
+  backdrop-filter:blur(4px);
+  z-index:1000;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+}
+
+.modal{
+  background:#1a1128;
+  border:1px solid rgba(168,118,255,.3);
+  border-radius:20px;
+  width:100%;
+  max-width:780px;
+  max-height:88vh;
+  display:flex;
+  flex-direction:column;
+  box-shadow:0 30px 80px rgba(0,0,0,.6);
+  overflow:hidden;
+}
+
+.modal-header{
+  padding:16px 20px;
+  border-bottom:1px solid rgba(255,255,255,.08);
+  display:flex;
+  align-items:center;
+  gap:12px;
+  flex-shrink:0;
+}
+.modal-title{
+  font-size:16px;
+  font-weight:700;
+  flex:1;
+}
+
+.modal-body{
+  overflow-y:auto;
+  flex:1;
+  padding:12px 16px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.modal-footer{
+  padding:14px 20px;
+  border-top:1px solid rgba(255,255,255,.08);
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+  flex-shrink:0;
+}
+
+/* Ligne de révision */
+.review-row{
+  background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:12px;
+  padding:12px;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+
+.review-meta{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:11px;
+}
+.review-label{
+  flex:1;
+  color:var(--muted);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.review-chars{
+  font-family:var(--mono);
+  font-size:11px;
+  font-weight:700;
+  padding:2px 7px;
+  border-radius:999px;
+}
+.chars-ok{ background:rgba(93,255,178,.15); color:var(--ok); }
+.chars-bad{ background:rgba(255,107,138,.15); color:var(--bad); }
+
+.review-original{
+  font-size:11px;
+  color:var(--muted);
+  font-family:var(--mono);
+  background:rgba(0,0,0,.2);
+  border-radius:8px;
+  padding:6px 8px;
+  line-height:1.4;
+  word-break:break-word;
+  user-select:all; /* sélectionnable facilement */
+  cursor:text;
+}
+
+.review-input{
+  width:100%;
+  background:rgba(168,118,255,.08);
+  border:1px solid rgba(168,118,255,.3);
+  border-radius:8px;
+  color:var(--text);
+  font-family:var(--mono);
+  font-size:12px;
+  padding:7px 10px;
+  resize:vertical;
+  line-height:1.5;
+}
+.review-input:focus{
+  outline:none;
+  border-color:rgba(168,118,255,.7);
+  background:rgba(168,118,255,.12);
+}
