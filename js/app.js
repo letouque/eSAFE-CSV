@@ -36,12 +36,13 @@ function log(msg, cls="") {
 function setStatus(t){ $("status").textContent = t; }
 function enableMainButtons(v){ $("run").disabled = !v; $("reset").disabled = !v; }
 function disableDownloads(){
-  $("dlFixed").disabled   = true;
-  $("dlLong").disabled    = true;
-  $("dlStats").disabled   = true;
-  $("dlFiles").disabled   = true;
-  $("dlFolders").disabled = true;
-  $("dlAll").disabled     = true;
+  $("dlFixed").disabled        = true;
+  $("dlLong").disabled         = true;
+  $("dlStats").disabled        = true;
+  $("dlFiles").disabled        = true;
+  $("dlFolders").disabled      = true;
+  $("dlAll").disabled          = true;
+  $("togglePreview").disabled  = true;
 }
 function safeGet(r,k){ return (r && Object.prototype.hasOwnProperty.call(r,k)) ? r[k] : ""; }
 function inferBaseName(fn){
@@ -667,6 +668,10 @@ function resetAll(){
   const cp = $("csvPreviewContainer");
   if (cp) cp.innerHTML = "";
 
+  // Cacher la section aperçu
+  const csvSec = $("csvPreviewSection");
+  if (csvSec) csvSec.style.display = "none";
+
   // Reset tabs
   const tabs = document.querySelectorAll(".tab-btn");
   tabs.forEach(t => t.classList.remove("active"));
@@ -909,6 +914,7 @@ $("run").addEventListener("click",()=>{
     $("dlFolders").disabled=false;
     $("dlLong").disabled=!state.longCsv;
     $("dlAll").disabled=false;
+    $("togglePreview").disabled=false;
 
     setStatus("Done ✓");
     renderKPIs();
@@ -921,8 +927,7 @@ $("run").addEventListener("click",()=>{
 
     const firstTab = document.querySelector(".tab-btn");
     if (firstTab) firstTab.click();
-    const csvSection = $("csvPreviewSection");
-    if (csvSection) csvSection.style.display = "block";
+    // Ne pas afficher automatiquement — le bouton toggle gère ça
 
     log(`Files/Folders générés (${Object.keys(filesOv).length + Object.keys(foldersOv).length} corrections manuelles).`,"ok");
   }
@@ -937,6 +942,15 @@ $("run").addEventListener("click",()=>{
 $("reset").addEventListener("click",()=>{
   $("file").value="";
   resetAll();
+});
+
+$("togglePreview").addEventListener("click",()=>{
+  const section = $("csvPreviewSection");
+  const btn = $("togglePreview");
+  if (!section) return;
+  const visible = section.style.display !== "none";
+  section.style.display = visible ? "none" : "block";
+  btn.textContent = visible ? "👁 Aperçu" : "👁 Masquer";
 });
 
 /* ===================== DOWNLOAD BUTTONS ===================== */
