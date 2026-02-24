@@ -235,13 +235,14 @@
       <div class="card">
         <h2>Downloads</h2>
 
-        <div class="row" style="justify-content:flex-end">
+        <div class="row" style="justify-content:flex-end;flex-wrap:wrap;">
           <button id="dlFixed"   class="btn"           disabled>Fixed CSV</button>
           <button id="dlFiles"   class="btn secondary" disabled>Files.csv</button>
           <button id="dlFolders" class="btn secondary" disabled>Folders.csv</button>
           <button id="dlLong"    class="btn secondary" disabled>Long titles</button>
           <button id="dlStats"   class="btn secondary" disabled>Stats</button>
           <button id="dlAll"     class="btn"           disabled>All ZIP</button>
+          <button id="togglePreview" class="btn secondary" disabled>👁 Aperçu</button>
         </div>
 
         <div class="kpi">
@@ -263,7 +264,7 @@
         </div>
 
         <!-- CSV PREVIEW SECTION -->
-        <div id="csvPreviewSection" style="display:none; margin-top:18px">
+        <div id="csvPreviewSection" style="display:none;margin-top:18px">
           <div class="tabs">
             <button class="tab-btn active" data-target="pane-fixed">Fixed CSV</button>
             <button class="tab-btn" data-target="pane-files">Files.csv</button>
