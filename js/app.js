@@ -110,17 +110,31 @@ function stripSenderPrefix(text){
 
   let x = text;
 
-  // Cas avec adresse email entre chevrons : "From Name <email@...> …"
+  // Cas avec guillemets : From "Org Name" <email>
+  x = x.replace(/^from\s+"[^"]*"\s*<[^>]*>\s*/i, "");
+
+  // Cas avec email entre chevrons sans guillemets : From Name <email>
   x = x.replace(/^from\s+[^<]{0,80}<[^>]*>\s*/i, "");
 
-  // Cas sans email : "From Prénom Nom" — exactement 2 mots (prénom + nom)
+  // Format inversé : From Nom, Prénom [Initiale.] → ex: Brownell, Sarah F.
   x = x.replace(
-    /^from\s+[A-Za-zÀ-ÖØ-öø-ÿ][a-zA-ZÀ-ÖØ-öø-ÿ\'\-]*\s+[A-Za-zÀ-ÖØ-öø-ÿ][a-zA-ZÀ-ÖØ-öø-ÿ\'\-]*\s+/i,
+    /^from\s+[A-Za-zÀ-ÖØ-öø-ÿ][a-zA-ZÀ-ÖØ-öø-ÿ'-]*,\s+[A-Za-zÀ-ÖØ-öø-ÿ][a-zA-ZÀ-ÖØ-öø-ÿ'-]*(?:\s+[A-Z]\.)?\s+/i,
     ""
   );
 
-  // Retirer les mots-résidus de type email (Letter/Mail/Message/Note)
-  // uniquement s'ils sont immédiatement suivis d'un préfixe email (re_, fwd_, etc.)
+  // Format avec initiale au milieu : From Prénom I. Nom → ex: Belen G. Vinuesa
+  x = x.replace(
+    /^from\s+[A-Za-zÀ-ÖØ-öø-ÿ][a-zA-ZÀ-ÖØ-öø-ÿ'-]*\s+[A-Z]\.\s+[A-Za-zÀ-ÖØ-öø-ÿ][a-zA-ZÀ-ÖØ-öø-ÿ'-]*\s+/i,
+    ""
+  );
+
+  // Format standard : From Prénom Nom (2 mots)
+  x = x.replace(
+    /^from\s+[A-Za-zÀ-ÖØ-öø-ÿ][a-zA-ZÀ-ÖØ-öø-ÿ'-]*\s+[A-Za-zÀ-ÖØ-öø-ÿ][a-zA-ZÀ-ÖØ-öø-ÿ'-]*\s+/i,
+    ""
+  );
+
+  // Mot-résidu (Letter/Mail/Message/Note) suivi d'un préfixe email
   x = x.replace(
     /^(?:letter|mail|e-?mail|message|note|courriel)\s+(?=(?:fwd?|re|r[ée]p?|tr)\s*[_:\-–\s])/i,
     ""
@@ -149,9 +163,8 @@ function stripEmailPrefixes(text){
 /* ── Étape 3 : normaliser les séparateurs ── */
 function normalizeSeparators(text){
   return text
-    .replace(/--+/g, "-")          // double tiret → simple tiret
-    .replace(/(?<!\w)_(?!\w)/g, " ") // underscore isolé → espace (ex: Re_  mais pas file_name)
-    .replace(/\s*-\s*/g, " - ")    // espaces autour des tirets simples
+    .replace(/--+/g, "-")   // double tiret → simple (seule règle tiret)
+    .replace(/_/g, " ")     // tous les _ → espace (normalizeSpaces gère les doubles)
     .trim();
 }
 
