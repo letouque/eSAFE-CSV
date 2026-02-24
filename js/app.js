@@ -89,15 +89,39 @@ function determineFinalExt(row){
      6. Ajouter l'extension             (toujours depuis id_path)
    ================================================================= */
 
-/* ── Étape 1 : expéditeur "From Firstname Lastname" en début de titre ── */
+/* ── Étape 1 : expéditeur "From Firstname Lastname" en début de titre ──
+   Règle unique : retire uniquement si le titre commence par "From ".
+   Couvre :
+     "From Raouf Mazou Letter to Mr. S…"          → "Letter to Mr. S…"
+     "From Raouf Mazou Letter re_ IDPs…"          → "IDPs…"
+     "From steven ursino <email> Re_ Assistance…" → "Assistance…"
+     "From Tina Divecha Briefing on…"             → "Briefing on…"
+     "A. Akodjenou Liberia Peace talks"           → inchangé (pas de From)
+     "HC Thank You Letters, Jan-Feb."             → inchangé (pas de From)
+*/
 function stripSenderPrefix(text){
   if (!text) return "";
-  // "From Firstname Lastname Re_…"  ou  "From Firstname Lastname:"
-  // On retire tout jusqu'au premier préfixe email connu ou jusqu'au premier mot clé
-  return text.replace(
-    /^from\s+[A-Za-zÀ-ÖØ-öø-ÿ ''-]{2,60?}\s+(?=re[_: ]|fwd?[_: ]|tr[_: ]|r[ée]p?[_: ]|\S)/i,
+  if (!/^from\s/i.test(text)) return text;
+
+  let x = text;
+
+  // Cas avec adresse email entre chevrons : "From Name <email@...> …"
+  x = x.replace(/^from\s+[^<]{0,80}<[^>]*>\s*/i, "");
+
+  // Cas sans email : "From Prénom Nom" — exactement 2 mots (prénom + nom)
+  x = x.replace(
+    /^from\s+[A-Za-zÀ-ÖØ-öø-ÿ][a-zA-ZÀ-ÖØ-öø-ÿ\'\-]*\s+[A-Za-zÀ-ÖØ-öø-ÿ][a-zA-ZÀ-ÖØ-öø-ÿ\'\-]*\s+/i,
     ""
-  ).trim();
+  );
+
+  // Retirer les mots-résidus de type email (Letter/Mail/Message/Note)
+  // uniquement s'ils sont immédiatement suivis d'un préfixe email (re_, fwd_, etc.)
+  x = x.replace(
+    /^(?:letter|mail|e-?mail|message|note|courriel)\s+(?=(?:fwd?|re|r[ée]p?|tr)\s*[_:\-–\s])/i,
+    ""
+  );
+
+  return x.trim();
 }
 
 /* ── Étape 2 : préfixes email imbriqués ── */
