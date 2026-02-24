@@ -42,7 +42,6 @@ function disableDownloads(){
   $("dlFiles").disabled        = true;
   $("dlFolders").disabled      = true;
   $("dlAll").disabled          = true;
-  $("togglePreview").disabled  = true;
 }
 function safeGet(r,k){ return (r && Object.prototype.hasOwnProperty.call(r,k)) ? r[k] : ""; }
 function inferBaseName(fn){
@@ -172,6 +171,18 @@ function normalizeSpaces(text){
   return text.replace(/\s+/g, " ").trim();
 }
 
+/* ── Étape 5 : supprimer les caractères illégaux ── */
+// Caractères interdits dans les noms de fichiers/dossiers
+const ILLEGAL_CHARS_RE = /[#%&{}\<>*?/$!'":@+`|=-￿\p{Emoji}]/gu;
+
+function removeIllegalChars(text){
+  return text
+    .replace(/\//g, "-")             // / → tiret (ex: 19/06 → 19-06)
+    .replace(ILLEGAL_CHARS_RE, "")   // supprimer les autres caractères illégaux
+    .replace(/\s+/g, " ")            // nettoyer les doubles espaces résultants
+    .trim();
+}
+
 /* ── Étape 5 : couper à la longueur max sur un mot entier ── */
 function shortenSmart(base, ext, maxLen){
   const ell = "…";
@@ -225,7 +236,10 @@ function smartRename(original, opts, row){
   // 4) Espaces
   x = normalizeSpaces(x);
 
-  // 5+6) Extension (depuis id_path) + longueur max
+  // 5) Supprimer les caractères illégaux
+  x = removeIllegalChars(x);
+
+  // 6+7) Extension (depuis id_path) + longueur max
   const { base } = splitBaseExt(x);
   const ext      = determineFinalExt(row);
   return shortenSmart(base, ext, maxLen);
@@ -318,45 +332,6 @@ function truncDisplay(s, n){
   return s.length > n ? s.slice(0, n) + "…" : s;
 }
 
-/* ===================== CSV APERÇU ===================== */
-
-function showCsvPreview(csv, title, containerId){
-  const container = $(containerId);
-  if (!container || !csv) return;
-
-  const parsed = Papa.parse(csv, { header: true, skipEmptyLines: true });
-  const rows   = parsed.data || [];
-  const fields = parsed.meta?.fields || [];
-
-  if (!rows.length){ container.innerHTML = "<em>Aucune donnée</em>"; return; }
-
-  const preview = rows.slice(0, 10);
-
-  let html = `<div class="csv-preview-header">
-    <span class="csv-preview-title">${escHtml(title)}</span>
-    <span class="pill">${rows.length} lignes · ${fields.length} col.</span>
-  </div>
-  <div class="tablewrap csv-scroll">
-    <table>
-      <thead><tr>${fields.map(f=>`<th>${escHtml(f)}</th>`).join("")}</tr></thead>
-      <tbody>`;
-
-  for (const row of preview){
-    html += "<tr>";
-    for (const f of fields){
-      const val = String(row[f] ?? "");
-      html += `<td title="${escHtml(val)}">${escHtml(truncDisplay(val, 40))}</td>`;
-    }
-    html += "</tr>";
-  }
-
-  html += `</tbody></table></div>`;
-  if (rows.length > 10){
-    html += `<div class="csv-preview-more">+ ${rows.length - 10} lignes non affichées</div>`;
-  }
-
-  container.innerHTML = html;
-}
 
 /* ===================== DOWNLOAD ===================== */
 
@@ -668,10 +643,6 @@ function resetAll(){
   const cp = $("csvPreviewContainer");
   if (cp) cp.innerHTML = "";
 
-  // Cacher la section aperçu
-  const csvSec = $("csvPreviewSection");
-  if (csvSec) csvSec.style.display = "none";
-
   // Reset tabs
   const tabs = document.querySelectorAll(".tab-btn");
   tabs.forEach(t => t.classList.remove("active"));
@@ -914,20 +885,11 @@ $("run").addEventListener("click",()=>{
     $("dlFolders").disabled=false;
     $("dlLong").disabled=!state.longCsv;
     $("dlAll").disabled=false;
-    $("togglePreview").disabled=false;
 
     setStatus("Done ✓");
     renderKPIs();
 
-    showCsvPreview(state.fixedCsv,   "Fixed CSV",    "pane-fixed");
-    showCsvPreview(state.filesCsv,   "Files.csv",    "pane-files");
-    showCsvPreview(state.foldersCsv, "Folders.csv",  "pane-folders");
-    if(state.longCsv)
-      showCsvPreview(state.longCsv,  "Long Titles",  "pane-long");
 
-    const firstTab = document.querySelector(".tab-btn");
-    if (firstTab) firstTab.click();
-    // Ne pas afficher automatiquement — le bouton toggle gère ça
 
     log(`Files/Folders générés (${Object.keys(filesOv).length + Object.keys(foldersOv).length} corrections manuelles).`,"ok");
   }
@@ -942,15 +904,6 @@ $("run").addEventListener("click",()=>{
 $("reset").addEventListener("click",()=>{
   $("file").value="";
   resetAll();
-});
-
-$("togglePreview").addEventListener("click",()=>{
-  const section = $("csvPreviewSection");
-  const btn = $("togglePreview");
-  if (!section) return;
-  const visible = section.style.display !== "none";
-  section.style.display = visible ? "none" : "block";
-  btn.textContent = visible ? "👁 Aperçu" : "👁 Masquer";
 });
 
 /* ===================== DOWNLOAD BUTTONS ===================== */
