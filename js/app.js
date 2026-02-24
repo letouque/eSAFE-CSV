@@ -95,14 +95,7 @@ function determineFinalExt(row){
    ================================================================= */
 
 /* ── Étape 1 : expéditeur "From Firstname Lastname" en début de titre ──
-   Règle unique : retire uniquement si le titre commence par "From ".
-   Couvre :
-     "From Raouf Mazou Letter to Mr. S…"          → "Letter to Mr. S…"
-     "From Raouf Mazou Letter re_ IDPs…"          → "IDPs…"
-     "From steven ursino <email> Re_ Assistance…" → "Assistance…"
-     "From Tina Divecha Briefing on…"             → "Briefing on…"
-     "A. Akodjenou Liberia Peace talks"           → inchangé (pas de From)
-     "HC Thank You Letters, Jan-Feb."             → inchangé (pas de From)
+   Règle : retire uniquement si le titre commence par "From ".
 */
 function stripSenderPrefix(text){
   if (!text) return "";
@@ -110,21 +103,27 @@ function stripSenderPrefix(text){
 
   let x = text;
 
-  // Cas avec guillemets : From "Org Name" <email>
-  x = x.replace(/^from\s+"[^"]*"\s*<[^>]*>\s*/i, "");
+  // Cas avec <email> : retirer From + tout ce qui précède + <email>
+  if (/<[^>]+>/.test(x)) {
+    x = x.replace(/^from\s+[^<]*<[^>]*>\s*/i, "");
+    return x.trim();
+  }
 
-  // Cas avec email entre chevrons sans guillemets : From Name <email>
-  x = x.replace(/^from\s+[^<]{0,80}<[^>]*>\s*/i, "");
-
-  // Format inversé : From Nom, Prénom [Initiale.] → ex: Brownell, Sarah F.
+  // Format inversé : From Nom, Prénom [I.]
   x = x.replace(
     /^from\s+[A-Za-zÀ-ÖØ-öø-ÿ][a-zA-ZÀ-ÖØ-öø-ÿ'-]*,\s+[A-Za-zÀ-ÖØ-öø-ÿ][a-zA-ZÀ-ÖØ-öø-ÿ'-]*(?:\s+[A-Z]\.)?\s+/i,
     ""
   );
 
-  // Format avec initiale au milieu : From Prénom I. Nom → ex: Belen G. Vinuesa
+  // Format avec initiale au milieu : From Prénom I. Nom
   x = x.replace(
     /^from\s+[A-Za-zÀ-ÖØ-öø-ÿ][a-zA-ZÀ-ÖØ-öø-ÿ'-]*\s+[A-Z]\.\s+[A-Za-zÀ-ÖØ-öø-ÿ][a-zA-ZÀ-ÖØ-öø-ÿ'-]*\s+/i,
+    ""
+  );
+
+  // Format 3 mots sans initiale : seulement si suivi d'un préfixe email
+  x = x.replace(
+    /^from\s+[A-Za-zÀ-ÖØ-öø-ÿ][a-zA-ZÀ-ÖØ-öø-ÿ'-]*\s+[A-Za-zÀ-ÖØ-öø-ÿ][a-zA-ZÀ-ÖØ-öø-ÿ'-]*\s+[A-Za-zÀ-ÖØ-öø-ÿ][a-zA-ZÀ-ÖØ-öø-ÿ'-]*\s+(?=(?:fwd?|re|r[ée]p?|tr)\s*[_:\-\u2013\s])/i,
     ""
   );
 
@@ -136,13 +135,12 @@ function stripSenderPrefix(text){
 
   // Mot-résidu (Letter/Mail/Message/Note) suivi d'un préfixe email
   x = x.replace(
-    /^(?:letter|mail|e-?mail|message|note|courriel)\s+(?=(?:fwd?|re|r[ée]p?|tr)\s*[_:\-–\s])/i,
+    /^(?:letter|mail|e-?mail|message|note|courriel)\s+(?=(?:fwd?|re|r[ée]p?|tr)\s*[_:\-\u2013\s])/i,
     ""
   );
 
   return x.trim();
 }
-
 /* ── Étape 2 : préfixes email imbriqués ── */
 // Couvre : Re_ RE: Re: Fwd_ FW: FWD: TR: Rép: Rep: Ré: R:
 // Boucle jusqu'à ce qu'il n'y en ait plus (cas imbriqués : Re: Fwd: Re: …)
@@ -512,15 +510,16 @@ function buildLongNamesReport(rows){
 
 /* ===================== FILES.CSV ===================== */
 
-function buildFilesCsv(rows){
+function buildFilesCsv(rows, overrides={}){
   const colSug=suggestedHeader();
   const out=[];
   for(const r of rows){
     if(String(safeGet(r,"type"))==="F"){
       const orig = safeGet(r,"isadg.title") || "";
-      const sug  = correctedTitle(orig, r);
+      const id   = safeGet(r,"id");
+      const sug  = overrides[id] !== undefined ? overrides[id] : correctedTitle(orig, r);
       out.push({
-        ID: safeGet(r,"id"),
+        ID: id,
         [colSug]: sug,
         original_title: orig
       });
@@ -534,7 +533,7 @@ function buildFilesCsv(rows){
 
 /* ===================== FOLDERS.CSV ===================== */
 
-function buildFoldersCsvSorted(rows){
+function buildFoldersCsvSorted(rows, overrides={}){
   const colSug=suggestedHeader();
   const folders=[];
   const byId=new Map();
@@ -548,8 +547,12 @@ function buildFoldersCsvSorted(rows){
 
       const sugFull = correctedTitle(orig,r);
       const sug     = splitBaseExt(sugFull).base;
+      // overrides keyed by id_path
+      const sugOver = overrides[String(safeGet(r,"id_path")||"")] !== undefined
+        ? overrides[String(safeGet(r,"id_path")||"")]
+        : sug;
 
-      const node = { id, id_path, parent_id: parent, suggested: sug, original: orig };
+      const node = { id, id_path, parent_id: parent, suggested: sugOver, original: orig, _autoSug: sug };
       folders.push(node);
       if (id) byId.set(id,node);
     }
@@ -688,6 +691,108 @@ function initTabs(){
   });
 }
 
+
+/* ===================== REVIEW MODAL ===================== */
+
+/**
+ * Ouvre la modale de révision pour les titres longs de Files + Folders.
+ * items = [{ key, type, original, suggested, label }]
+ * onConfirm(overridesFiles, overridesFolders) appelé quand on valide.
+ */
+function openReviewModal(items, onConfirm){
+  const maxLen = parseInt($("renameMaxLen").value || "80", 10);
+  const longItems = items.filter(it => it.suggested.length > maxLen || it.original.length > maxLen);
+
+  if (!longItems.length){
+    onConfirm({}, {});
+    return;
+  }
+
+  // Créer la modale
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+
+  const modal = document.createElement("div");
+  modal.className = "modal";
+
+  modal.innerHTML = `
+    <div class="modal-header">
+      <span class="modal-title">✏️ Révision des titres longs</span>
+      <span class="pill">${longItems.length} titre${longItems.length>1?"s":""} · seuil ${maxLen} car.</span>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer">
+      <button class="btn secondary" id="modalClose">Fermer (garder propositions)</button>
+      <button class="btn" id="modalConfirm">Valider les corrections</button>
+    </div>
+  `;
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  const body = modal.querySelector("#modalBody");
+
+  // Construire la liste
+  for (const item of longItems){
+    const row = document.createElement("div");
+    row.className = "review-row";
+    row.innerHTML = `
+      <div class="review-meta">
+        <span class="type-badge type-${item.type.toLowerCase()}">${item.type}</span>
+        <span class="review-label" title="${escHtml(item.key)}">${escHtml(truncDisplay(item.key, 60))}</span>
+        <span class="review-chars ${item.suggested.length > maxLen ? "chars-bad" : "chars-ok"}" id="chars-${item.key.replace(/\//g,'_')}">${item.suggested.length} car.</span>
+      </div>
+      <div class="review-original" title="${escHtml(item.original)}">${escHtml(item.original)}</div>
+      <textarea class="review-input" data-key="${escHtml(item.key)}" data-type="${escHtml(item.type)}"
+        rows="2" spellcheck="false">${escHtml(item.suggested)}</textarea>
+    `;
+    body.appendChild(row);
+  }
+
+  // Compteur de caractères live
+  body.querySelectorAll(".review-input").forEach(ta => {
+    ta.addEventListener("input", () => {
+      const key = ta.dataset.key.replace(/\//g,'_');
+      const el = modal.querySelector(`#chars-${key}`);
+      if (el){
+        const len = ta.value.length;
+        el.textContent = len + " car.";
+        el.className = "review-chars " + (len > maxLen ? "chars-bad" : "chars-ok");
+      }
+    });
+  });
+
+  function collect(){
+    const filesOv = {}, foldersOv = {};
+    body.querySelectorAll(".review-input").forEach(ta => {
+      const type = ta.dataset.type;
+      const key  = ta.dataset.key;
+      if (type === "F") filesOv[key]   = ta.value;
+      else              foldersOv[key] = ta.value;
+    });
+    return { filesOv, foldersOv };
+  }
+
+  modal.querySelector("#modalClose").addEventListener("click", () => {
+    document.body.removeChild(overlay);
+    onConfirm({}, {});
+  });
+
+  modal.querySelector("#modalConfirm").addEventListener("click", () => {
+    const { filesOv, foldersOv } = collect();
+    document.body.removeChild(overlay);
+    onConfirm(filesOv, foldersOv);
+  });
+
+  // Fermer sur clic overlay
+  overlay.addEventListener("click", e => {
+    if (e.target === overlay){
+      document.body.removeChild(overlay);
+      onConfirm({}, {});
+    }
+  });
+}
+
 /* ===================== EVENTS ===================== */
 
 $("file").addEventListener("change",(e)=>{
@@ -764,36 +869,69 @@ $("run").addEventListener("click",()=>{
   applyRules(rows);
   computeTypeCounts(rows);
 
-  state.fixedCsv   = buildFixedCsv(rows);
-  state.longCsv    = buildLongNamesReport(rows);
-  state.statsCsv   = buildStatsReport();
-  state.filesCsv   = buildFilesCsv(rows);
-  state.foldersCsv = buildFoldersCsvSorted(rows);
+  state.fixedCsv = buildFixedCsv(rows);
+  state.longCsv  = buildLongNamesReport(rows);
+  state.statsCsv = buildStatsReport();
 
   log("Processing complete.","ok");
 
-  $("dlFixed").disabled=false;
-  $("dlStats").disabled=false;
-  $("dlFiles").disabled=false;
-  $("dlFolders").disabled=false;
-  $("dlLong").disabled=!state.longCsv;
-  $("dlAll").disabled=false;
+  // Collecter les titres longs pour Files + Folders
+  const maxLen = parseInt($("renameMaxLen").value || "80", 10);
+  const reviewItems = [];
+  const colSug = suggestedHeader();
 
-  setStatus("Done ✓");
-  renderKPIs();
+  for (const r of rows){
+    const type = String(safeGet(r,"type")||"");
+    const orig = String(safeGet(r,"isadg.title")||"").trim();
+    if (!orig) continue;
 
-  // Afficher les aperçus CSV
-  showCsvPreview(state.fixedCsv,   "Fixed CSV",    "pane-fixed");
-  showCsvPreview(state.filesCsv,   "Files.csv",    "pane-files");
-  showCsvPreview(state.foldersCsv, "Folders.csv",  "pane-folders");
-  if(state.longCsv)
-    showCsvPreview(state.longCsv,  "Long Titles",  "pane-long");
+    if (type === "F"){
+      const sug = correctedTitle(orig, r);
+      if (orig.length > maxLen || sug.length > maxLen){
+        reviewItems.push({ key: safeGet(r,"id"), type: "F", original: orig, suggested: sug });
+      }
+    } else if (type === "O"){
+      const sugFull = correctedTitle(orig, r);
+      const sug = splitBaseExt(sugFull).base;
+      if (orig.length > maxLen || sug.length > maxLen){
+        reviewItems.push({ key: safeGet(r,"id_path"), type: "O", original: orig, suggested: sug });
+      }
+    }
+  }
 
-  // Activer le premier onglet
-  const firstTab = document.querySelector(".tab-btn");
-  if (firstTab) firstTab.click();
-  const csvSection = $("csvPreviewSection");
-  if (csvSection) csvSection.style.display = "block";
+  function finalize(filesOv, foldersOv){
+    state.filesCsv   = buildFilesCsv(rows, filesOv);
+    state.foldersCsv = buildFoldersCsvSorted(rows, foldersOv);
+
+    $("dlFixed").disabled=false;
+    $("dlStats").disabled=false;
+    $("dlFiles").disabled=false;
+    $("dlFolders").disabled=false;
+    $("dlLong").disabled=!state.longCsv;
+    $("dlAll").disabled=false;
+
+    setStatus("Done ✓");
+    renderKPIs();
+
+    showCsvPreview(state.fixedCsv,   "Fixed CSV",    "pane-fixed");
+    showCsvPreview(state.filesCsv,   "Files.csv",    "pane-files");
+    showCsvPreview(state.foldersCsv, "Folders.csv",  "pane-folders");
+    if(state.longCsv)
+      showCsvPreview(state.longCsv,  "Long Titles",  "pane-long");
+
+    const firstTab = document.querySelector(".tab-btn");
+    if (firstTab) firstTab.click();
+    const csvSection = $("csvPreviewSection");
+    if (csvSection) csvSection.style.display = "block";
+
+    log(`Files/Folders générés (${Object.keys(filesOv).length + Object.keys(foldersOv).length} corrections manuelles).`,"ok");
+  }
+
+  if (reviewItems.length > 0){
+    openReviewModal(reviewItems, (filesOv, foldersOv) => finalize(filesOv, foldersOv));
+  } else {
+    finalize({}, {});
+  }
 });
 
 $("reset").addEventListener("click",()=>{
