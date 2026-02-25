@@ -20,6 +20,7 @@ const state = {
   statsCsv: null,
   filesCsv: null,
   foldersCsv: null,
+  pathLongCsv: null,
   changedCount: 0,
   longCount: 0,
   typeCounts: {}
@@ -41,6 +42,7 @@ function disableDownloads(){
   $("dlStats").disabled        = true;
   $("dlFiles").disabled        = true;
   $("dlFolders").disabled      = true;
+  $("dlPathLong").disabled     = true;
   $("dlAll").disabled          = true;
 }
 function safeGet(r,k){ return (r && Object.prototype.hasOwnProperty.call(r,k)) ? r[k] : ""; }
@@ -390,6 +392,76 @@ function buildStatsReport(){
   return Papa.unparse(rows,{delimiter:state.delimiter});
 }
 
+/* ===================== PATH TOO LONG REPORT ===================== */
+
+const PATH_MAX = 250;
+
+function buildPathTooLongReport(rows, filesOverrides={}, foldersOverrides={}){
+  // Construire un map id → suggested title pour tous les O et F
+  const idToTitle = new Map();
+
+  for (const r of rows){
+    const type    = String(safeGet(r,"type")||"");
+    const id      = String(safeGet(r,"id")||"");
+    const id_path = String(safeGet(r,"id_path")||"");
+    const orig    = String(safeGet(r,"isadg.title")||"").trim();
+    if (!id) continue;
+
+    let sug;
+    if (type === "F"){
+      sug = filesOverrides[id] !== undefined ? filesOverrides[id] : correctedTitle(orig, r);
+    } else if (type === "O"){
+      const sugFull = foldersOverrides[id_path] !== undefined
+        ? foldersOverrides[id_path]
+        : correctedTitle(orig, r);
+      sug = splitBaseExt(sugFull).base;
+    } else {
+      sug = orig;
+    }
+    idToTitle.set(id, sug || id);
+  }
+
+  // Pour chaque fichier (type F), reconstituer le chemin complet
+  const out = [];
+  for (const r of rows){
+    if (String(safeGet(r,"type")||"") !== "F") continue;
+
+    const id_path = String(safeGet(r,"id_path")||"");
+    if (!id_path) continue;
+
+    // Séparer les segments, retirer l'extension du dernier
+    const segments = id_path.split("/");
+    const renamedSegments = segments.map((seg, i) => {
+      // Le dernier segment peut avoir une extension
+      const { base, ext } = splitBaseExt(seg);
+      const title = idToTitle.get(base) || idToTitle.get(seg) || seg;
+      return i === segments.length - 1 ? title : title;
+    });
+
+    const fullPath = renamedSegments.join("/");
+    if (fullPath.length > PATH_MAX){
+      const orig = String(safeGet(r,"isadg.title")||"").trim();
+      out.push({
+        id_path_original: id_path,
+        id_path_renamed:  fullPath,
+        path_length:      fullPath.length,
+        file_id:          safeGet(r,"id"),
+        original_title:   orig,
+        suggested_title:  idToTitle.get(String(safeGet(r,"id")||"")) || orig
+      });
+    }
+  }
+
+  out.sort((a,b) => b.path_length - a.path_length);
+
+  if (!out.length) return null;
+
+  return Papa.unparse(out, {
+    delimiter: state.delimiter,
+    columns: ["id_path_original","id_path_renamed","path_length","file_id","original_title","suggested_title"]
+  });
+}
+
 /* ===================== FIXED CSV RULES ===================== */
 
 function applyRules(rows){
@@ -573,11 +645,11 @@ function buildFoldersCsvSorted(rows, overrides={}){
     if(!depth.has(n.id)) depth.set(n.id,0);
   }
 
+  // Tri : enfants avant parents (plus profond en premier)
+  // Puis par id_path pour un ordre stable et prévisible
   folders.sort((a,b)=>{
-    const da=depth.get(a.id), db=depth.get(b.id);
-    if(da!==db) return da-db;
-    const t=a.suggested.localeCompare(b.suggested,"en",{sensitivity:"base"});
-    if(t!==0) return t;
+    const da=depth.get(a.id)??0, db=depth.get(b.id)??0;
+    if(da!==db) return db-da;  // profondeur décroissante : enfants d'abord
     return a.id_path.localeCompare(b.id_path);
   });
 
@@ -628,6 +700,7 @@ function resetAll(){
   state.statsCsv=null;
   state.filesCsv=null;
   state.foldersCsv=null;
+  state.pathLongCsv=null;
   state.changedCount=0;
   state.longCount=0;
   state.typeCounts={};
@@ -876,15 +949,24 @@ $("run").addEventListener("click",()=>{
   }
 
   function finalize(filesOv, foldersOv){
-    state.filesCsv   = buildFilesCsv(rows, filesOv);
-    state.foldersCsv = buildFoldersCsvSorted(rows, foldersOv);
+    state.filesCsv    = buildFilesCsv(rows, filesOv);
+    state.foldersCsv  = buildFoldersCsvSorted(rows, foldersOv);
+    state.pathLongCsv = buildPathTooLongReport(rows, filesOv, foldersOv);
 
     $("dlFixed").disabled=false;
     $("dlStats").disabled=false;
     $("dlFiles").disabled=false;
     $("dlFolders").disabled=false;
     $("dlLong").disabled=!state.longCsv;
+    $("dlPathLong").disabled=!state.pathLongCsv;
     $("dlAll").disabled=false;
+
+    if (state.pathLongCsv){
+      const n = Papa.parse(state.pathLongCsv,{header:true}).data.length;
+      log(`⚠ ${n} chemin${n>1?"s":""} dépassent ${PATH_MAX} caractères — voir rapport "Path > 250".`, "warn");
+    } else {
+      log("Tous les chemins sont dans la limite de 250 caractères.", "ok");
+    }
 
     setStatus("Done ✓");
     renderKPIs();
@@ -923,15 +1005,19 @@ $("dlFiles").addEventListener("click",()=>{
 $("dlFolders").addEventListener("click",()=>{
   if(state.foldersCsv) downloadText("Folders.csv",state.foldersCsv);
 });
+$("dlPathLong").addEventListener("click",()=>{
+  if(state.pathLongCsv) downloadText(`${state.fileNameBase}_path_too_long.csv`,state.pathLongCsv);
+});
 $("dlAll").addEventListener("click",async()=>{
   const zip=new JSZip();
   const base=state.fileNameBase||"export";
 
   zip.file(`${base}_fixed.csv`,state.fixedCsv||"");
-  if(state.longCsv)  zip.file(`${base}_long_titles.csv`,state.longCsv);
-  if(state.statsCsv) zip.file(`${base}_stats.csv`,state.statsCsv);
-  if(state.filesCsv) zip.file(`Files.csv`,state.filesCsv);
-  if(state.foldersCsv) zip.file(`Folders.csv`,state.foldersCsv);
+  if(state.longCsv)     zip.file(`${base}_long_titles.csv`,state.longCsv);
+  if(state.statsCsv)    zip.file(`${base}_stats.csv`,state.statsCsv);
+  if(state.filesCsv)    zip.file(`Files.csv`,state.filesCsv);
+  if(state.foldersCsv)  zip.file(`Folders.csv`,state.foldersCsv);
+  if(state.pathLongCsv) zip.file(`${base}_path_too_long.csv`,state.pathLongCsv);
 
   const blob=await zip.generateAsync({type:"blob"});
   const url=URL.createObjectURL(blob);
