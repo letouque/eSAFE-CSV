@@ -173,7 +173,7 @@ function normalizeSpaces(text){
 
 /* ── Étape 5 : supprimer les caractères illégaux ── */
 // Caractères interdits dans les noms de fichiers/dossiers
-const ILLEGAL_CHARS_RE = /[#%&{}\<>*?/$!'":@+`|=-￿\p{Emoji}]/gu;
+const ILLEGAL_CHARS_RE = /[#%&{}\\<>*?$!'":@+`|=]/g;
 
 function removeIllegalChars(text){
   return text
