@@ -175,13 +175,11 @@ function normalizeSpaces(text){
 
 /* ── Étape 5 : supprimer les caractères illégaux ── */
 // Caractères interdits dans les noms de fichiers/dossiers
-const ILLEGAL_CHARS_RE = /[#%&{}\\<>*?$!'":@+`|=]/g;
-
 function removeIllegalChars(text){
   return text
-    .replace(/\//g, "-")             // / → tiret (ex: 19/06 → 19-06)
-    .replace(ILLEGAL_CHARS_RE, "")   // supprimer les autres caractères illégaux
-    .replace(/\s+/g, " ")            // nettoyer les doubles espaces résultants
+    .replace(/\/\//g, "-")                          // / → tiret (19/06 → 19-06)
+    .replace(/[^a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF0-9\s\-]/g, " ")  // lettres (+ accents), chiffres, espaces, tirets
+    .replace(/\s+/g, " ")                           // nettoyer les doubles espaces
     .trim();
 }
 
@@ -716,29 +714,9 @@ function resetAll(){
   const cp = $("csvPreviewContainer");
   if (cp) cp.innerHTML = "";
 
-  // Reset tabs
-  const tabs = document.querySelectorAll(".tab-btn");
-  tabs.forEach(t => t.classList.remove("active"));
-  const first = tabs[0];
-  if (first) first.classList.add("active");
-  document.querySelectorAll(".csv-preview-pane").forEach(p => p.style.display = "none");
-  const fp = $("pane-fixed");
-  if (fp) fp.style.display = "block";
 }
 
-/* ===================== TABS CSV PREVIEW ===================== */
 
-function initTabs(){
-  document.querySelectorAll(".tab-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-      document.querySelectorAll(".csv-preview-pane").forEach(p => p.style.display = "none");
-      btn.classList.add("active");
-      const target = $(btn.dataset.target);
-      if (target) target.style.display = "block";
-    });
-  });
-}
 
 
 /* ===================== REVIEW MODAL ===================== */
@@ -1030,5 +1008,4 @@ $("dlAll").addEventListener("click",async()=>{
 });
 
 /* ===================== INIT ===================== */
-initTabs();
 resetAll();
