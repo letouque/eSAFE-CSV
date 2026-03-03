@@ -412,10 +412,12 @@ function buildPathTooLongReport(rows, filesOverrides={}, foldersOverrides={}){
     if (type === "F"){
       sug = filesOverrides[id] !== undefined ? filesOverrides[id] : correctedTitle(orig, r);
     } else if (type === "O"){
-      const sugFull = foldersOverrides[id_path] !== undefined
-        ? foldersOverrides[id_path]
+      const oPath = String(safeGet(r,"isadg.sources")||safeGet(r,"id_path")||"");
+      const sugFull = foldersOverrides[oPath] !== undefined
+        ? foldersOverrides[oPath]
         : correctedTitle(orig, r);
       sug = splitBaseExt(sugFull).base;
+      idToTitle.set(id, sug || id);  // réindexer sous le bon id
     } else {
       sug = orig;
     }
@@ -591,15 +593,14 @@ function buildFoldersCsvSorted(rows, overrides={}){
     if(String(safeGet(r,"type"))==="O"){
       const id      = String(safeGet(r,"id")||"");
       const parent  = String(safeGet(r,"parent_id")||"");
-      const id_path = String(safeGet(r,"id_path")||"");
+      // Pour les dossiers (O), id_path est dans isadg.sources (ex: 123/456/789)
+      const id_path = String(safeGet(r,"isadg.sources")||safeGet(r,"id_path")||"");
       const orig    = String(safeGet(r,"isadg.title")||"");
 
       const sugFull = correctedTitle(orig,r);
       const sug     = splitBaseExt(sugFull).base;
       // overrides keyed by id_path
-      const sugOver = overrides[String(safeGet(r,"id_path")||"")] !== undefined
-        ? overrides[String(safeGet(r,"id_path")||"")]
-        : sug;
+      const sugOver = overrides[id_path] !== undefined ? overrides[id_path] : sug;
 
       const node = { id, id_path, parent_id: parent, suggested: sugOver, original: orig, _autoSug: sug };
       folders.push(node);
@@ -924,7 +925,8 @@ $("run").addEventListener("click",()=>{
       const sugFull = correctedTitle(orig, r);
       const sug = splitBaseExt(sugFull).base;
       if (orig.length > maxLen || sug.length > maxLen){
-        reviewItems.push({ key: safeGet(r,"id_path"), type: "O", original: orig, suggested: sug });
+        const oPath = String(safeGet(r,"isadg.sources")||safeGet(r,"id_path")||"");
+        reviewItems.push({ key: oPath, type: "O", original: orig, suggested: sug });
       }
     }
   }
