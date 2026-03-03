@@ -219,10 +219,13 @@ function smartRename(original, opts, row){
 
   const maxLen = parseInt(opts.maxLen || "80", 10);
 
-  // Si "only long" activé : ne traiter que les titres qui dépassent maxLen
-  if (opts.onlyLong && String(original).trim().length <= maxLen) return String(original).trim();
-
   let x = String(original).normalize("NFC").trim();
+
+  // Toujours supprimer les caractères illégaux, même pour les titres courts
+  x = removeIllegalChars(x);
+
+  // Si "only long" activé : arrêter ici si le titre ne dépasse pas maxLen
+  if (opts.onlyLong && x.length <= maxLen) return x;
 
   // 1) Expéditeur en tête
   if (opts.stripSender)   x = stripSenderPrefix(x);
@@ -236,7 +239,7 @@ function smartRename(original, opts, row){
   // 4) Espaces
   x = normalizeSpaces(x);
 
-  // 5) Supprimer les caractères illégaux
+  // 5) Supprimer les caractères illégaux (deuxième passe après nettoyage)
   x = removeIllegalChars(x);
 
   // 6+7) Extension (depuis id_path) + longueur max
