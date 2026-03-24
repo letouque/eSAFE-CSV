@@ -262,6 +262,21 @@
             </tbody>
           </table>
         </div>
+
+        <!-- CSV PREVIEW SECTION -->
+        <div id="csvPreviewSection" style="display:none;margin-top:18px">
+          <div class="tabs">
+            <button class="tab-btn active" data-target="pane-fixed">Fixed CSV</button>
+            <button class="tab-btn" data-target="pane-files">Files.csv</button>
+            <button class="tab-btn" data-target="pane-folders">Folders.csv</button>
+            <button class="tab-btn" data-target="pane-long">Long Titles</button>
+          </div>
+          <div id="pane-fixed"   class="csv-preview-pane" style="display:block"></div>
+          <div id="pane-files"   class="csv-preview-pane" style="display:none"></div>
+          <div id="pane-folders" class="csv-preview-pane" style="display:none"></div>
+          <div id="pane-long"    class="csv-preview-pane" style="display:none"></div>
+        </div>
+
         <div class="footer">
           UTF‑8 with BOM.<br>
           Files/Folders include:
