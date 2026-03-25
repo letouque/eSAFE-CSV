@@ -681,6 +681,7 @@ function buildFixedCsv(rows){
   const rowsOut = rows.map(r=>{
     const o={...r};
     if(remove) delete o["id_path"];
+    delete o["dc.id"];
     return o;
   });
 
@@ -689,6 +690,8 @@ function buildFixedCsv(rows){
     fieldsOut = fieldsOut.filter(f=>f!=="id_path");
     log("Removed id_path from Fixed CSV","ok");
   }
+  fieldsOut = fieldsOut.filter(f=>f!=="dc.id");
+  log("Removed dc.id from Fixed CSV","ok");
 
   return Papa.unparse(rowsOut,{
     delimiter:state.delimiter,
