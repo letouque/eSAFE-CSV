@@ -479,7 +479,7 @@ function applyRules(rows){
   if(dup){
     ensure("id_display_name");
     ensure("dc.title");
-    ensure("dc.id");
+    ensure("dc.identifier");
     ensure("dc.date");
     ensure("dc.format");
     ensure("dc.type");
@@ -510,7 +510,7 @@ function applyRules(rows){
 
       if(r["id_display_name"]!==t){ r["id_display_name"]=t; state.changedCount++; }
       if(r["dc.title"]!==t){        r["dc.title"]=t;        state.changedCount++; }
-      if(r["dc.id"]!==id){          r["dc.id"]=id;          state.changedCount++; }
+      if(r["dc.identifier"]!==id){  r["dc.identifier"]=id;  state.changedCount++; }
       if(r["dc.date"]!==dt){        r["dc.date"]=dt;        state.changedCount++; }
       if(r["dc.format"]!==scope){   r["dc.format"]=scope;   state.changedCount++; }
       if(r["dc.type"]!==phys){      r["dc.type"]=phys;      state.changedCount++; }
